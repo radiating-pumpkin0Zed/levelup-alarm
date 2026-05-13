@@ -1,925 +1,581 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <meta name="theme-color" content="#0a0a0f" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="LEVEL UP" />
-  <title>LEVEL UP — Alarm System</title>
-
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
-
-  <style>
-    :root {
-      --bg: #0a0a0f;
-      --surface: #0f0f1a;
-      --card: #13131f;
-      --border: #1e1e3a;
-      --accent: #ff003c;
-      --accent2: #00ffe1;
-      --accent3: #ff6b00;
-      --text: #e0e0ff;
-      --muted: #5a5a8a;
-      --glow-red: 0 0 20px rgba(255,0,60,0.5);
-      --glow-cyan: 0 0 20px rgba(0,255,225,0.4);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Share Tech Mono', monospace;
-      min-height: 100vh;
-      overflow-x: hidden;
-    }
-
-    /* Scanline overlay */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 2px,
-        rgba(0,0,0,0.07) 2px,
-        rgba(0,0,0,0.07) 4px
-      );
-      pointer-events: none;
-      z-index: 9999;
-    }
-
-    /* Noise texture */
-    body::after {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 9998;
-      opacity: 0.4;
-    }
-
-    .header {
-      padding: 32px 20px 0;
-      text-align: center;
-      position: relative;
-    }
-
-    .header-glitch {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: clamp(48px, 15vw, 80px);
-      letter-spacing: 0.1em;
-      color: var(--accent);
-      text-shadow: var(--glow-red), 3px 0 0 rgba(0,255,225,0.4), -3px 0 0 rgba(255,107,0,0.4);
-      animation: glitch 4s infinite;
-      line-height: 1;
-    }
-
-    @keyframes glitch {
-      0%, 90%, 100% { transform: translate(0); clip-path: none; }
-      91% { transform: translate(-2px, 1px); }
-      92% { transform: translate(2px, -1px); clip-path: polygon(0 30%, 100% 30%, 100% 55%, 0 55%); }
-      93% { transform: translate(0); clip-path: none; }
-      95% { transform: translate(1px, 0); }
-      96% { transform: translate(-1px, 0); }
-    }
-
-    .header-sub {
-      font-family: 'Orbitron', monospace;
-      font-size: 11px;
-      color: var(--accent2);
-      letter-spacing: 0.3em;
-      margin-top: 4px;
-      text-shadow: var(--glow-cyan);
-    }
-
-    .clock-display {
-      text-align: center;
-      margin: 24px 20px 0;
-      padding: 20px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-top: 2px solid var(--accent2);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .clock-display::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0; height: 1px;
-      background: linear-gradient(90deg, transparent, var(--accent2), transparent);
-      animation: scan 3s linear infinite;
-    }
-
-    @keyframes scan {
-      0% { opacity: 0; transform: translateX(-100%); }
-      50% { opacity: 1; }
-      100% { opacity: 0; transform: translateX(100%); }
-    }
-
-    #live-clock {
-      font-family: 'Orbitron', monospace;
-      font-size: clamp(36px, 12vw, 60px);
-      font-weight: 900;
-      color: var(--accent2);
-      text-shadow: var(--glow-cyan);
-      letter-spacing: 0.05em;
-    }
-
-    #live-date {
-      font-size: 11px;
-      color: var(--muted);
-      letter-spacing: 0.2em;
-      margin-top: 4px;
-    }
-
-    #next-task-display {
-      margin-top: 12px;
-      font-size: 13px;
-      color: var(--accent3);
-      letter-spacing: 0.1em;
-    }
-
-    #next-task-display span {
-      color: var(--text);
-    }
-
-    /* STATUS */
-    .status-bar {
-      margin: 16px 20px 0;
-      padding: 12px 16px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 12px;
-    }
-
-    .status-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: var(--accent);
-      animation: pulse 1.5s ease-in-out infinite;
-      flex-shrink: 0;
-    }
-
-    .status-dot.active { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
-    .status-dot.warn { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(0.7); }
-    }
-
-    #status-text { color: var(--text); }
-
-    /* ENABLE BUTTON */
-    .enable-btn {
-      display: block;
-      width: calc(100% - 40px);
-      margin: 16px 20px 0;
-      padding: 18px;
-      background: transparent;
-      border: 2px solid var(--accent);
-      color: var(--accent);
-      font-family: 'Orbitron', monospace;
-      font-size: 14px;
-      font-weight: 700;
-      letter-spacing: 0.2em;
-      cursor: pointer;
-      text-transform: uppercase;
-      position: relative;
-      overflow: hidden;
-      transition: all 0.2s;
-    }
-
-    .enable-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: var(--accent);
-      transform: translateX(-100%);
-      transition: transform 0.2s;
-      z-index: -1;
-    }
-
-    .enable-btn:hover::before, .enable-btn:active::before { transform: translateX(0); }
-    .enable-btn:hover, .enable-btn:active { color: #0a0a0f; }
-
-    .enable-btn:disabled {
-      border-color: #00ff88;
-      color: #00ff88;
-      cursor: default;
-    }
-
-    .enable-btn:disabled::before { display: none; }
-
-    /* SECTION */
-    .section {
-      margin: 20px 20px 0;
-    }
-
-    .section-title {
-      font-family: 'Orbitron', monospace;
-      font-size: 10px;
-      color: var(--muted);
-      letter-spacing: 0.35em;
-      padding-bottom: 8px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .section-title::before {
-      content: '//';
-      color: var(--accent);
-    }
-
-    /* TASK LIST */
-    .task-list {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .task-item {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 10px 14px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-left: 2px solid transparent;
-      transition: all 0.3s;
-      position: relative;
-    }
-
-    .task-item.current {
-      border-left-color: var(--accent2);
-      background: rgba(0,255,225,0.05);
-      box-shadow: var(--glow-cyan);
-    }
-
-    .task-item.done {
-      border-left-color: var(--muted);
-      opacity: 0.45;
-    }
-
-    .task-item.upcoming {
-      border-left-color: var(--border);
-    }
-
-    .task-time {
-      font-family: 'Orbitron', monospace;
-      font-size: 11px;
-      color: var(--accent2);
-      min-width: 48px;
-      font-weight: 700;
-    }
-
-    .task-item.done .task-time { color: var(--muted); }
-
-    .task-label {
-      font-size: 13px;
-      color: var(--text);
-      flex: 1;
-      line-height: 1.3;
-    }
-
-    .task-item.done .task-label {
-      text-decoration: line-through;
-      color: var(--muted);
-    }
-
-    .task-emoji {
-      font-size: 16px;
-    }
-
-    .current-badge {
-      font-family: 'Orbitron', monospace;
-      font-size: 8px;
-      background: var(--accent2);
-      color: #000;
-      padding: 2px 6px;
-      letter-spacing: 0.1em;
-      font-weight: 700;
-      animation: blink 1s step-end infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
-    }
-
-    /* PROGRESS */
-    .progress-section {
-      margin: 0 20px;
-      padding: 16px;
-      background: var(--card);
-      border: 1px solid var(--border);
-    }
-
-    .progress-label {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: var(--muted);
-      margin-bottom: 8px;
-      letter-spacing: 0.1em;
-    }
-
-    #progress-pct { color: var(--accent3); font-weight: bold; }
-
-    .progress-bar {
-      height: 6px;
-      background: var(--border);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--accent3));
-      transition: width 1s ease;
-      box-shadow: 0 0 10px var(--accent);
-    }
-
-    /* LOG */
-    #log-area {
-      font-size: 11px;
-      color: var(--muted);
-      line-height: 1.8;
-      max-height: 120px;
-      overflow-y: auto;
-      padding: 12px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-    }
-
-    #log-area div { border-bottom: 1px solid rgba(255,255,255,0.03); padding: 2px 0; }
-    #log-area .log-time { color: var(--accent2); }
-    #log-area .log-fire { color: var(--accent); }
-
-    /* TEST BUTTON */
-    .test-btn {
-      display: block;
-      width: calc(100% - 40px);
-      margin: 0 20px;
-      padding: 12px;
-      background: transparent;
-      border: 1px dashed var(--muted);
-      color: var(--muted);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 12px;
-      cursor: pointer;
-      letter-spacing: 0.15em;
-      transition: all 0.2s;
-    }
-
-    .test-btn:hover, .test-btn:active {
-      border-color: var(--accent3);
-      color: var(--accent3);
-    }
-
-    /* INSTALL GUIDE */
-    .install-guide {
-      margin: 0 20px;
-      padding: 16px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-top: 2px solid var(--accent3);
-    }
-
-    .install-guide p {
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.8;
-    }
-
-    .install-guide strong { color: var(--accent3); }
-    .install-guide em { color: var(--accent2); font-style: normal; }
-
-    /* MANIFEST HIDDEN */
-    .bottom-pad { height: 40px; }
-
-    /* NOTIFICATION TOAST */
-    #toast {
-      position: fixed;
-      bottom: 24px;
-      left: 20px; right: 20px;
-      padding: 16px;
-      background: var(--card);
-      border: 1px solid var(--accent);
-      border-left: 4px solid var(--accent);
-      font-size: 13px;
-      color: var(--text);
-      z-index: 99999;
-      transform: translateY(120%);
-      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-      box-shadow: var(--glow-red);
-    }
-
-    #toast.show { transform: translateY(0); }
-    #toast-title { color: var(--accent); font-family: 'Orbitron', monospace; font-size: 11px; margin-bottom: 4px; letter-spacing: 0.1em; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#06060f"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="LEVEL UP"/>
+<title>LEVEL UP // SYSTEM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#06060f;--bg2:#0a0a18;--card:#0d0d1f;--card2:#111127;
+  --border:#1a1a36;--border2:#22224a;
+  --r:#ff0040;--c:#00ffcc;--c2:#00ccaa;--y:#ffaa00;
+  --g:#00ff88;--g2:#00cc66;--fail:#ff2244;
+  --muted:#3a3a6a;--muted2:#5a5a9a;--text:#dde0ff;--text2:#9090c0;
+  --gR:0 0 24px rgba(255,0,64,.55);--gC:0 0 24px rgba(0,255,204,.45);
+  --gG:0 0 24px rgba(0,255,136,.45);--gY:0 0 20px rgba(255,170,0,.5);
+  --fd:'Bebas Neue',sans-serif;--fu:'Orbitron',monospace;--fm:'Share Tech Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{background:var(--bg);color:var(--text);font-family:var(--fm);min-height:100dvh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,255,204,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,204,.025) 1px,transparent 1px);background-size:40px 40px;pointer-events:none;z-index:0}
+body::after{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(0,0,0,.055) 3px,rgba(0,0,0,.055) 4px);pointer-events:none;z-index:9999}
+.z{position:relative;z-index:1}
+ 
+/* HEADER */
+.hdr{padding:28px 18px 0;text-align:center}
+.htitle{font-family:var(--fd);font-size:clamp(60px,19vw,96px);line-height:.88;color:var(--r);text-shadow:var(--gR),4px 0 0 rgba(0,255,204,.3),-4px 0 0 rgba(255,170,0,.3);letter-spacing:.08em;animation:glitch 5s infinite}
+@keyframes glitch{0%,88%,100%{transform:translate(0);filter:none}89%{transform:translate(-3px,1px);filter:hue-rotate(90deg)}90%{transform:translate(3px,-1px)}91%{transform:translate(0);filter:none}94%{transform:translate(2px,0)}95%{transform:translate(-2px,0)}}
+.hsub{font-family:var(--fu);font-size:9px;letter-spacing:.45em;color:var(--c);text-shadow:var(--gC);margin-top:6px}
+ 
+/* CLOCK */
+.clk-wrap{margin:20px 16px 0;padding:18px 20px;background:var(--card);border:1px solid var(--border2);border-top:2px solid var(--c);position:relative;overflow:hidden}
+.sweep{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--c),transparent);animation:sw 2.5s linear infinite}
+@keyframes sw{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+#clk{font-family:var(--fu);font-size:clamp(40px,13vw,65px);font-weight:900;color:var(--c);text-shadow:var(--gC);letter-spacing:.04em;text-align:center}
+#clk-date{font-size:10px;color:var(--muted2);letter-spacing:.22em;text-align:center;margin-top:3px}
+.clk-next{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:11px;gap:8px}
+.cn-lab{color:var(--muted2);letter-spacing:.1em;flex-shrink:0}
+#cn-val{color:var(--y);font-weight:bold;text-align:right;flex:1;font-size:11px}
+ 
+/* STATUS */
+.st{margin:12px 16px 0;padding:10px 14px;background:var(--card);border:1px solid var(--border);border-left:3px solid var(--r);display:flex;align-items:center;gap:10px;font-size:11px;transition:border-left-color .3s}
+.st.ok{border-left-color:var(--g)}.st.warn{border-left-color:var(--y)}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--r);flex-shrink:0;animation:dp 1.4s ease infinite}
+.st.ok .sdot{background:var(--g);box-shadow:0 0 8px var(--g)}.st.warn .sdot{background:var(--y);box-shadow:0 0 8px var(--y)}
+@keyframes dp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.6)}}
+ 
+/* RPG */
+.rpg{margin:12px 16px 0;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.rc{background:var(--card);border:1px solid var(--border);padding:12px 8px;text-align:center;position:relative;overflow:hidden}
+.rc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.rc.rxp::before{background:var(--c)}.rc.rlv::before{background:var(--y)}.rc.rst::before{background:var(--r)}
+.rv{font-family:var(--fu);font-size:clamp(20px,6vw,26px);font-weight:900;line-height:1}
+.rc.rxp .rv{color:var(--c);text-shadow:var(--gC)}.rc.rlv .rv{color:var(--y);text-shadow:var(--gY)}.rc.rst .rv{color:var(--r);text-shadow:var(--gR)}
+.rk{font-size:9px;color:var(--muted2);letter-spacing:.18em;margin-top:4px}
+.rsub{font-size:9px;color:var(--muted);margin-top:2px}
+.rankbadge{background:rgba(255,170,0,.15);border:1px solid var(--y);color:var(--y);padding:1px 6px;font-size:8px;font-family:var(--fu)}
+ 
+/* XP BAR */
+.xpbar{margin:10px 16px 0;background:var(--card);border:1px solid var(--border);padding:10px 14px}
+.xl{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-bottom:6px}
+.xl span{color:var(--c)}
+.xtr{height:8px;background:var(--border);overflow:hidden}
+.xf{height:100%;background:linear-gradient(90deg,var(--c2),var(--c));transition:width .8s cubic-bezier(.34,1.56,.64,1);box-shadow:0 0 10px var(--c)}
+ 
+/* ACTIVATE */
+.abtn{display:block;width:calc(100% - 32px);margin:14px 16px 0;padding:16px;background:transparent;border:2px solid var(--r);color:var(--r);font-family:var(--fu);font-size:13px;font-weight:700;letter-spacing:.2em;cursor:pointer;position:relative;overflow:hidden;transition:color .2s}
+.abtn::before{content:'';position:absolute;inset:0;background:var(--r);transform:translateX(-101%);transition:transform .25s;z-index:0}
+.abtn:hover::before,.abtn:active::before{transform:translateX(0)}
+.abtn:hover,.abtn:active{color:#06060f}
+.abtn span{position:relative;z-index:1}
+.abtn:disabled{border-color:var(--g);color:var(--g);cursor:default}
+.abtn:disabled::before{display:none}
+ 
+/* DAY STATS */
+.ds{margin:14px 16px 0;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dc{background:var(--card);border:1px solid var(--border);padding:12px 8px;text-align:center}
+.dn{font-family:var(--fu);font-size:clamp(24px,8vw,32px);font-weight:900;line-height:1}
+.dc.ddc .dn{color:var(--g)}.dc.dfc .dn{color:var(--fail)}.dc.dpc .dn{color:var(--muted2)}
+.dl{font-size:9px;color:var(--muted2);letter-spacing:.18em;margin-top:4px}
+ 
+/* PROGRESS */
+.prog{margin:0 16px;background:var(--card);border:1px solid var(--border);padding:12px 14px}
+.pr{display:flex;justify-content:space-between;font-size:10px;color:var(--muted2);margin-bottom:6px}
+.pr span{color:var(--y);font-weight:bold}
+.pt{height:10px;background:var(--border);overflow:hidden}
+.pf{height:100%;background:linear-gradient(90deg,var(--r),var(--y),var(--g));transition:width 1s ease;box-shadow:0 0 12px var(--y)}
+ 
+/* SECTION */
+.sec{margin:18px 16px 0}
+.sh{font-family:var(--fu);font-size:9px;color:var(--muted2);letter-spacing:.35em;padding-bottom:8px;border-bottom:1px solid var(--border);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between}
+.sh::before{content:'// ';color:var(--r)}
+ 
+/* TASK LIST */
+.tl{display:flex;flex-direction:column;gap:6px}
+.ti{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border);overflow:hidden;transition:border-left-color .3s,background .3s,opacity .3s;animation:fi .3s ease both}
+@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.ti.tnow{border-left-color:var(--c);background:rgba(0,255,204,.04)}
+.ti.tdone{border-left-color:var(--g);background:rgba(0,255,136,.04);opacity:.65}
+.ti.tfail{border-left-color:var(--fail);background:rgba(255,34,68,.05)}
+.ti.tup{border-left-color:var(--border)}
+.ti.fgreen{animation:fG .65s ease forwards}
+.ti.fred{animation:fR .65s ease forwards}
+@keyframes fG{0%{background:rgba(0,255,136,.3)}100%{background:rgba(0,255,136,.04)}}
+@keyframes fR{0%{background:rgba(255,34,68,.35);transform:translateX(-4px)}15%{transform:translateX(4px)}30%{transform:translateX(-2px)}45%{transform:translateX(2px)}100%{background:rgba(255,34,68,.05);transform:none}}
+.tmain{display:flex;align-items:stretch;min-height:66px}
+.ttc{padding:10px 12px;display:flex;flex-direction:column;justify-content:center;align-items:center;min-width:66px;border-right:1px solid var(--border);background:rgba(0,0,0,.2);flex-shrink:0}
+.ttime{font-family:var(--fu);font-size:10px;font-weight:700;color:var(--c);line-height:1.2}
+.ti.tdone .ttime{color:var(--g)}.ti.tfail .ttime{color:var(--fail)}
+.temoji{font-size:18px;margin-top:5px}
+.tbody{padding:10px 10px 10px 12px;flex:1;display:flex;flex-direction:column;justify-content:center;gap:3px}
+.tlbl{font-size:13px;color:var(--text);line-height:1.3;font-weight:bold}
+.ti.tdone .tlbl{text-decoration:line-through;color:var(--muted2)}.ti.tfail .tlbl{color:var(--fail)}
+.txp{font-size:10px;color:var(--muted2)}
+.tright{padding:8px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;flex-shrink:0;border-left:1px solid var(--border);min-width:72px}
+.badge{font-family:var(--fu);font-size:8px;font-weight:700;padding:3px 7px;letter-spacing:.1em}
+.bnow{background:var(--c);color:#000;animation:blk 1s step-end infinite}
+.bdone{background:var(--g);color:#000}.bfail{background:var(--fail);color:#fff}.bup{background:var(--border);color:var(--muted2)}
+@keyframes blk{0%,100%{opacity:1}50%{opacity:0}}
+.tbtn{font-family:var(--fu);font-size:9px;font-weight:700;padding:6px 8px;border:1px solid;letter-spacing:.08em;cursor:pointer;background:transparent;transition:all .15s;white-space:nowrap}
+.bcomp{border-color:var(--g);color:var(--g)}.bcomp:active{background:var(--g);color:#000}
+.bundo{border-color:var(--muted2);color:var(--muted2);font-size:8px}.bundo:active{background:var(--muted2);color:#000}
+.bredo{border-color:var(--y);color:var(--y)}.bredo:active{background:var(--y);color:#000}
+ 
+/* XP FLOAT */
+.xpf{position:fixed;pointer-events:none;z-index:99998;font-family:var(--fu);font-size:18px;font-weight:900;animation:xpr 1.5s ease forwards}
+.xpf.gn{color:var(--g);text-shadow:var(--gG)}.xpf.ls{color:var(--fail);text-shadow:var(--gR)}
+@keyframes xpr{0%{opacity:1;transform:translateY(0) scale(1)}60%{opacity:1;transform:translateY(-65px) scale(1.25)}100%{opacity:0;transform:translateY(-110px) scale(.8)}}
+ 
+/* TOAST */
+.toast{position:fixed;bottom:20px;left:16px;right:16px;padding:14px 16px;background:var(--card2);border:1px solid var(--r);border-left:4px solid var(--r);z-index:999999;transform:translateY(140%);transition:transform .35s cubic-bezier(.34,1.56,.64,1);box-shadow:var(--gR)}
+.toast.show{transform:translateY(0)}
+.toast.tok{border-color:var(--g);border-left-color:var(--g);box-shadow:var(--gG)}
+.ttl{font-family:var(--fu);font-size:10px;letter-spacing:.12em;margin-bottom:4px}
+.toast:not(.tok) .ttl{color:var(--r)}.toast.tok .ttl{color:var(--g)}
+.tbody2{font-size:12px;color:var(--text);line-height:1.5}
+ 
+/* LOG */
+#log{font-size:11px;color:var(--muted2);line-height:2;max-height:130px;overflow-y:auto;padding:10px 12px;background:var(--bg2);border:1px solid var(--border);scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+#log div{border-bottom:1px solid rgba(255,255,255,.03)}
+.lt{color:var(--c)}.lf{color:var(--fail)}.lg{color:var(--g)}.ly{color:var(--y)}
+ 
+/* BTNS */
+.btnrow{display:flex;gap:8px;margin:0 16px}
+.sbtn{flex:1;padding:11px 8px;background:transparent;border:1px dashed var(--border2);color:var(--muted2);font-family:var(--fm);font-size:11px;cursor:pointer;letter-spacing:.08em;transition:all .2s}
+.sbtn:active,.sbtn:hover{border-color:var(--y);color:var(--y)}
+ 
+/* INSTALL */
+.inst{margin:0 16px;padding:16px;background:var(--card);border:1px solid var(--border);border-top:2px solid var(--y)}
+.inst p{font-size:12px;color:var(--muted2);line-height:2}
+.inst strong{color:var(--y)}.inst em{color:var(--c);font-style:normal}
+ 
+/* LVL UP */
+.lvo{position:fixed;inset:0;background:rgba(0,0,0,.93);z-index:1000000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+.lvtxt{font-family:var(--fd);font-size:clamp(64px,22vw,112px);color:var(--y);text-shadow:var(--gY),0 0 60px rgba(255,170,0,.4);letter-spacing:.1em;animation:lvp .5s ease infinite alternate}
+@keyframes lvp{from{transform:scale(1)}to{transform:scale(1.06)}}
+.lvsub{font-family:var(--fu);font-size:13px;color:var(--c);letter-spacing:.3em;text-align:center}
+.lvclose{margin-top:8px;padding:14px 32px;border:2px solid var(--y);background:transparent;color:var(--y);font-family:var(--fu);font-size:12px;letter-spacing:.2em;cursor:pointer}
+.spark{position:fixed;pointer-events:none;animation:sp 1s ease forwards;font-size:22px;z-index:1000001}
+@keyframes sp{0%{opacity:1;transform:scale(1) rotate(0)}100%{opacity:0;transform:scale(3) rotate(720deg)}}
+</style>
 </head>
 <body>
-
-  <div class="header">
-    <div class="header-glitch">LEVEL UP</div>
-    <div class="header-sub">POST-EXAM ARC // ALARM SYSTEM v1.0</div>
+<div class="z">
+ 
+<div class="hdr">
+  <div class="htitle">LEVEL UP</div>
+  <div class="hsub">POST-EXAM ARC // MISSION CONTROL v2.0</div>
+</div>
+ 
+<div class="clk-wrap">
+  <div class="sweep"></div>
+  <div id="clk">00:00:00</div>
+  <div id="clk-date">—</div>
+  <div class="clk-next">
+    <span class="cn-lab">▶ NEXT</span>
+    <span id="cn-val">—</span>
   </div>
-
-  <div class="clock-display">
-    <div id="live-clock">00:00:00</div>
-    <div id="live-date">LOADING...</div>
-    <div id="next-task-display">NEXT: <span id="next-task-name">—</span> @ <span id="next-task-time">—</span></div>
-  </div>
-
-  <div class="status-bar">
-    <div class="status-dot" id="status-dot"></div>
-    <div id="status-text">Initializing alarm system...</div>
-  </div>
-
-  <button class="enable-btn" id="enable-btn" onclick="requestPermission()">
-    ⚡ ACTIVATE NOTIFICATIONS
-  </button>
-
-  <div style="height:16px"></div>
-
-  <div style="margin: 0 20px 16px;">
-    <div class="progress-label">
-      <span>TODAY'S PROGRESS</span>
-      <span id="progress-pct">0%</span>
-    </div>
-    <div class="progress-bar">
-      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">TODAY'S MISSION TIMELINE</div>
-    <div class="task-list" id="task-list"></div>
-  </div>
-
-  <div style="height:16px"></div>
-
-  <button class="test-btn" onclick="sendTestNotification()">
-    [ TEST: FIRE A NOTIFICATION NOW ]
-  </button>
-
-  <div style="height:16px"></div>
-
-  <div class="section">
-    <div class="section-title">SYSTEM LOG</div>
-    <div id="log-area"><div><span class="log-time">[BOOT]</span> System online. Waiting for activation...</div></div>
-  </div>
-
-  <div style="height:16px"></div>
-
-  <div class="section">
-    <div class="section-title">INSTALLATION GUIDE</div>
-    <div class="install-guide">
-      <p>
-        <strong>Android Chrome:</strong><br/>
-        Tap ⋮ menu → <em>"Add to Home Screen"</em> → Install<br/><br/>
-        <strong>iPhone Safari:</strong><br/>
-        Tap Share ↑ → <em>"Add to Home Screen"</em><br/><br/>
-        <strong>Then:</strong> Open the app from home screen, tap <em>ACTIVATE NOTIFICATIONS</em>, and leave app running in background. Keep screen on or phone charged.<br/><br/>
-        <strong>NOTE:</strong> For best results, keep this tab open. On Android, it can run in background if added to home screen.
-      </p>
-    </div>
-  </div>
-
-  <div class="bottom-pad"></div>
-
-  <div id="toast">
-    <div id="toast-title">ALARM</div>
-    <div id="toast-body">Time to work.</div>
-  </div>
-
-  <script>
-    // ═══════════════════════════════════════════════
-    // SCHEDULE — Based on your exact timetable PDF
-    // ═══════════════════════════════════════════════
-    const SCHEDULE = [
-      {
-        time: "07:00", emoji: "🔴",
-        label: "WAKE UP",
-        msg: "GET UP. RIGHT NOW. Your alarm doesn't negotiate. Neither does failure.",
-        title: "⚡ WAKE UP — NO SNOOZE"
-      },
-      {
-        time: "07:15", emoji: "🏃",
-        label: "Exercise / Walk / Stretching",
-        msg: "Move your body. You cannot code with a corpse brain. 15 minutes. GO.",
-        title: "🏃 MOVE YOUR BODY"
-      },
-      {
-        time: "07:45", emoji: "🍳",
-        label: "Breakfast + Plan Today",
-        msg: "Eat. Write down ONE goal for today. Not ten. ONE. Pick the hardest one.",
-        title: "🍳 FUEL UP + PLAN"
-      },
-      {
-        time: "08:15", emoji: "🧠",
-        label: "DSA / LeetCode [1.5 hr]",
-        msg: "DEEP WORK BEGINS. Arrays, Strings, Hashing. Phone goes face-down. START.",
-        title: "🧠 DSA — DEEP WORK"
-      },
-      {
-        time: "10:00", emoji: "☕",
-        label: "Break (30 min)",
-        msg: "Earned break. Do NOT open Instagram. You get 30 minutes. Not 90.",
-        title: "☕ BREAK — 30 MIN ONLY"
-      },
-      {
-        time: "10:30", emoji: "💻",
-        label: "Web Development [2.5 hr]",
-        msg: "Open your editor. NOT YouTube. Code → Break → Code. Build something real today.",
-        title: "💻 WEB DEV — BUILD TIME"
-      },
-      {
-        time: "13:00", emoji: "🍱",
-        label: "Lunch + Rest [1 hr]",
-        msg: "Eat properly. Rest. No doomscrolling. Your brain is not a landfill.",
-        title: "🍱 LUNCH BREAK"
-      },
-      {
-        time: "14:00", emoji: "🔤",
-        label: "English + Typing Practice",
-        msg: "Monkeytype is open. No excuses. Think in English. Speak thoughts out loud. GO.",
-        title: "⌨️ TYPING + ENGLISH"
-      },
-      {
-        time: "15:00", emoji: "🎨",
-        label: "Creative Skill [Editing / Pixel Art]",
-        msg: "ONE skill. Not five. Create one thing today. Even small. Make it real.",
-        title: "🎨 CREATE SOMETHING"
-      },
-      {
-        time: "16:00", emoji: "🌤️",
-        label: "Free Time",
-        msg: "You earned this. Decompress. Don't plan new ambitions during free time. Just exist.",
-        title: "🌤️ FREE TIME"
-      },
-      {
-        time: "17:00", emoji: "⚒️",
-        label: "Project Building [2 hr]",
-        msg: "BUILD. Not watch. Not plan. Write actual code. Push to GitHub. Ship or die.",
-        title: "⚒️ PROJECT TIME — SHIP IT"
-      },
-      {
-        time: "19:00", emoji: "🍜",
-        label: "Dinner + Rest",
-        msg: "You've been building. Eat. Rest your eyes. Come back stronger in 1 hour.",
-        title: "🍜 DINNER BREAK"
-      },
-      {
-        time: "20:00", emoji: "📖",
-        label: "Revision / Light Coding [1.5 hr]",
-        msg: "Review what you learned today. Fix bugs. Read docs. Light but consistent.",
-        title: "📖 REVISION TIME"
-      },
-      {
-        time: "21:30", emoji: "😮‍💨",
-        label: "Chill Time",
-        msg: "Wind down. Anime, music, walk. You worked hard. You earned silence.",
-        title: "😮‍💨 CHILL OUT"
-      },
-      {
-        time: "22:30", emoji: "📋",
-        label: "Daily Evaluation",
-        msg: "Write 3 things: What did I complete? What distracted me? What improved? Be honest.",
-        title: "📋 DAILY REVIEW"
-      },
-      {
-        time: "23:00", emoji: "🌙",
-        label: "SLEEP PREP — Screens Off",
-        msg: "Put the phone down. Close the laptop. Your future self is built while you sleep.",
-        title: "🌙 SLEEP NOW — REST IS WORK"
-      },
-      {
-        time: "23:30", emoji: "💤",
-        label: "LIGHTS OUT",
-        msg: "IF YOU'RE STILL AWAKE — what are you doing. Sleep is not optional. CLOSE YOUR EYES.",
-        title: "💤 SERIOUSLY. SLEEP."
-      },
-    ];
-
-    // ═══════════════════════════════════════════════
-    // STATE
-    // ═══════════════════════════════════════════════
-    let notificationsEnabled = false;
-    let scheduledTimeouts = [];
-    let tickerInterval = null;
-
-    // ═══════════════════════════════════════════════
-    // UTILS
-    // ═══════════════════════════════════════════════
-    function parseTime(timeStr) {
-      const [h, m] = timeStr.split(':').map(Number);
-      const now = new Date();
-      const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
-      return t;
+</div>
+ 
+<div class="st" id="st"><div class="sdot"></div><div id="stmsg">Initializing...</div></div>
+ 
+<div class="rpg">
+  <div class="rc rxp"><div class="rv" id="rxp">0</div><div class="rk">TOTAL XP</div></div>
+  <div class="rc rlv"><div class="rv" id="rlv">1</div><div class="rk">LEVEL</div><div class="rsub rankbadge" id="rrank">ROOKIE</div></div>
+  <div class="rc rst"><div class="rv" id="rst">0</div><div class="rk">🔥 STREAK</div><div class="rsub" id="rbest">BEST: 0</div></div>
+</div>
+ 
+<div class="xpbar">
+  <div class="xl">LEVEL PROGRESS <span id="xpnext">0/200 XP</span></div>
+  <div class="xtr"><div class="xf" id="xf" style="width:0%"></div></div>
+</div>
+ 
+<button class="abtn" id="abtn" onclick="reqPerm()"><span>⚡ ACTIVATE ALARM SYSTEM</span></button>
+ 
+<div class="ds">
+  <div class="dc ddc"><div class="dn" id="ctd">0</div><div class="dl">✓ DONE</div></div>
+  <div class="dc dfc"><div class="dn" id="ctf">0</div><div class="dl">✗ FAILED</div></div>
+  <div class="dc dpc"><div class="dn" id="ctp">0</div><div class="dl">○ LEFT</div></div>
+</div>
+ 
+<div class="prog" style="margin:10px 16px 0">
+  <div class="pr">TODAY'S COMPLETION <span id="ppct">0%</span></div>
+  <div class="pt"><div class="pf" id="pf" style="width:0%"></div></div>
+</div>
+ 
+<div class="sec">
+  <div class="sh">MISSION TIMELINE <span id="dbadge" style="font-size:9px;color:var(--c)">—</span></div>
+  <div class="tl" id="tl"></div>
+</div>
+ 
+<div style="height:14px"></div>
+<div class="btnrow">
+  <button class="sbtn" onclick="testN()">[ TEST ALARM ]</button>
+  <button class="sbtn" onclick="resetDay()">[ RESET TODAY ]</button>
+</div>
+ 
+<div class="sec">
+  <div class="sh">SYSTEM LOG</div>
+  <div id="log"><div><span class="lt">[BOOT]</span> System online. Tap ACTIVATE to arm alarms.</div></div>
+</div>
+ 
+<div style="height:14px"></div>
+ 
+<div class="sec">
+  <div class="sh">INSTALLATION</div>
+  <div class="inst"><p>
+    <strong>Android Chrome:</strong> Tap ⋮ → <em>"Add to Home Screen"</em><br/><br/>
+    <strong>iPhone Safari:</strong> Tap Share ↑ → <em>"Add to Home Screen"</em><br/><br/>
+    Open from home screen → tap <em>ACTIVATE</em> → keep app running.<br/><br/>
+    <strong>⚠ Penalty:</strong> Miss a task's window without marking it done = <em>shame notification + −25 XP.</em>
+  </p></div>
+</div>
+ 
+<div style="height:36px"></div>
+</div>
+ 
+<div class="toast" id="toast"><div class="ttl" id="ttl">—</div><div class="tbody2" id="tbody">—</div></div>
+ 
+<div class="lvo" id="lvo" style="display:none" onclick="closeLvl()">
+  <div class="lvtxt">LEVEL UP!</div>
+  <div class="lvsub" id="lvsub">LEVEL 2 — INITIATE</div>
+  <button class="lvclose">[ CONTINUE ]</button>
+</div>
+ 
+<script>
+const SCHED=[
+  {id:'0700',time:'07:00',emoji:'🔴',label:'WAKE UP',xp:30,
+   alarm:'GET UP. RIGHT NOW. Not in 5 minutes. NOW. Your future self is watching.',
+   penalty:'You ignored wake-up. Every story of success started with getting out of bed.'},
+  {id:'0715',time:'07:15',emoji:'🏃',label:'Exercise / Walk / Stretch',xp:40,
+   alarm:'15 minutes. Move your body. You cannot think clearly inside a stiff corpse.',
+   penalty:'Skipped exercise. Your brain runs on blood flow. You just starved it.'},
+  {id:'0745',time:'07:45',emoji:'🍳',label:'Breakfast + Daily Planning',xp:25,
+   alarm:'Eat real food. Write ONE goal for today. Not a list — one priority. Go.',
+   penalty:'No breakfast plan = no direction. You are now a ship with no rudder.'},
+  {id:'0815',time:'08:15',emoji:'🧠',label:'DSA / LeetCode [1.5 hr]',xp:80,
+   alarm:'DEEP WORK. Phone face-down. Arrays, strings, hashing. One problem at a time.',
+   penalty:'DSA session MISSED. The gap between you and your goals just got wider.'},
+  {id:'1000',time:'10:00',emoji:'☕',label:'Break [30 min]',xp:15,
+   alarm:'Earned break. Step away from screen. Do NOT open Instagram. 30 mins.',
+   penalty:''},
+  {id:'1030',time:'10:30',emoji:'💻',label:'Web Development [2.5 hr]',xp:90,
+   alarm:'Editor open. Tutorial must produce something REAL today. Build, do not watch.',
+   penalty:'WEB DEV MISSED. Watching tutorials without coding is collecting recipes without cooking.'},
+  {id:'1300',time:'13:00',emoji:'🍱',label:'Lunch + Rest [1 hr]',xp:15,
+   alarm:'Eat properly. Rest your eyes. No doom-scrolling. Your attention is a resource.',
+   penalty:''},
+  {id:'1400',time:'14:00',emoji:'⌨️',label:'English + Typing Practice',xp:40,
+   alarm:'Monkeytype is open. Think in English. 3 new words. Speak thoughts aloud.',
+   penalty:'Typing/English skipped. Fluency is built in boring daily reps. You just skipped one.'},
+  {id:'1500',time:'15:00',emoji:'🎨',label:'Creative Skill [Editing / Pixel Art]',xp:45,
+   alarm:'ONE creative skill. Not five. Make one thing today. Tiny is fine. Make it real.',
+   penalty:'Creative session MISSED. Zero output is the only true failure.'},
+  {id:'1600',time:'16:00',emoji:'🌤️',label:'Free Time',xp:10,
+   alarm:'Decompress. Rest. You are allowed to exist without being productive for 1 hour.',
+   penalty:''},
+  {id:'1700',time:'17:00',emoji:'⚒️',label:'Project Building [2 hr]',xp:100,
+   alarm:'BUILD TIME. Actual code. Actual commits. Push something to GitHub today. Go.',
+   penalty:'PROJECT SESSION MISSED. A portfolio with zero projects is just a blank page.'},
+  {id:'1900',time:'19:00',emoji:'🍜',label:'Dinner + Rest',xp:10,
+   alarm:'Eat. Rest your eyes. Come back in an hour stronger.',
+   penalty:''},
+  {id:'2000',time:'20:00',emoji:'📖',label:'Revision / Light Coding [1.5 hr]',xp:50,
+   alarm:'Review today\'s work. Fix one bug. Reinforce one concept. Consistent.',
+   penalty:'Evening revision SKIPPED. The forgetting curve is real. You just lost retention.'},
+  {id:'2130',time:'21:30',emoji:'😮‍💨',label:'Chill Time',xp:10,
+   alarm:'Wind down. Anime, music, walk. You earned this. Protect it.',
+   penalty:''},
+  {id:'2230',time:'22:30',emoji:'📋',label:'Daily Evaluation',xp:35,
+   alarm:'Write 3 things: What I completed. What distracted me. What improved. Honest.',
+   penalty:'No daily review = no self-awareness = same mistakes tomorrow. 5 minutes. That\'s all.'},
+  {id:'2300',time:'23:00',emoji:'🌙',label:'Screens Off — Sleep Prep',xp:20,
+   alarm:'Phone down. Laptop closed. Dim the lights. Brain needs to wind down.',
+   penalty:'Screen time cut skipped. Blue light destroys sleep quality. You will feel this tomorrow.'},
+  {id:'2330',time:'23:30',emoji:'💤',label:'LIGHTS OUT',xp:25,
+   alarm:'IF YOU ARE STILL AWAKE — close your eyes. Sleep is recovery. NOW.',
+   penalty:'Still awake past 11:30 PM. Tomorrow\'s 7 AM alarm will feel like punishment. You chose this.'},
+];
+ 
+const LEVELS=[
+  {l:1,n:'ROOKIE',xp:0},{l:2,n:'INITIATE',xp:200},{l:3,n:'BUILDER',xp:500},
+  {l:4,n:'GRINDER',xp:1000},{l:5,n:'CODER',xp:2000},{l:6,n:'DEVELOPER',xp:3500},
+  {l:7,n:'VETERAN',xp:5500},{l:8,n:'MASTER',xp:8000},{l:9,n:'LEGEND',xp:11000},
+];
+ 
+function getLvlInfo(xp){
+  let cur=LEVELS[0],next=LEVELS[1]||null;
+  for(let i=0;i<LEVELS.length;i++){if(xp>=LEVELS[i].xp){cur=LEVELS[i];next=LEVELS[i+1]||null;}}
+  return{cur,next};
+}
+function getLevel(xp){let l=1;for(const v of LEVELS){if(xp>=v.xp)l=v.l;}return l;}
+ 
+const SK='lu_v2';
+function load(){try{const r=localStorage.getItem(SK);if(r)return JSON.parse(r);}catch(e){}return{days:{},stats:{streak:0,bestStreak:0,totalXP:0,level:1,lastDate:null}};}
+function save(d){try{localStorage.setItem(SK,JSON.stringify(d));}catch(e){}}
+function todayKey(){const n=new Date();return`${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;}
+function initDay(d,k){if(!d.days[k]){d.days[k]={};SCHED.forEach(t=>{d.days[k][t.id]='pending';});}return d.days[k];}
+ 
+let data=load();
+let notifOn=false;
+let handles=[];
+let todayStr=todayKey();
+ 
+function parseHM(t){const[h,m]=t.split(':').map(Number);return h*60+m;}
+function msUntil(t){const[h,m]=t.split(':').map(Number);const n=new Date();const tgt=new Date(n.getFullYear(),n.getMonth(),n.getDate(),h,m,0,0);return tgt-n;}
+function fmt12(t){const[h,m]=t.split(':').map(Number);const ap=h>=12?'PM':'AM';return`${h%12||12}:${String(m).padStart(2,'0')} ${ap}`;}
+function nowM(){const n=new Date();return n.getHours()*60+n.getMinutes();}
+ 
+async function reqPerm(){
+  if(!('Notification' in window)){toast('NOT SUPPORTED','Use Chrome on Android or Safari 16.4+.',false);return;}
+  const p=await Notification.requestPermission();
+  if(p==='granted'){
+    notifOn=true;
+    const b=document.getElementById('abtn');b.textContent='✅ ALARMS ARMED';b.disabled=true;
+    setSt('ARMED. All alarms scheduled.','ok');
+    log('Permission granted. Scheduling alarms...','lf');
+    schedAll();
+    toast('SYSTEM ARMED','Alarms active. You have no excuses now.',true);
+  } else {
+    setSt('Notifications blocked. Enable in browser settings.','warn');
+    log('PERMISSION DENIED — browser settings → site notifications.','lf');
+    toast('BLOCKED','Browser Settings → Site Settings → Notifications → Allow.',false);
+  }
+}
+ 
+function fireN(title,body,type='alarm'){
+  toast(title,body,type==='complete');
+  log(`NOTIF: ${title}`,type==='complete'?'lg':type==='penalty'?'lf':'ly');
+  if(!notifOn)return;
+  try{
+    const n=new Notification(title,{body,tag:'lu'+Date.now(),requireInteraction:type!=='complete'});
+    n.onclick=()=>{window.focus();n.close();};
+  }catch(e){log('Notif err: '+e.message,'lf');}
+}
+ 
+function schedAll(){
+  handles.forEach(clearTimeout);handles=[];
+  let armed=0;
+  SCHED.forEach((task,i)=>{
+    const ms=msUntil(task.time);
+    if(ms>0){
+      handles.push(setTimeout(()=>{log(`⏰ ALARM: ${task.label}`,'ly');fireN(`⏰ ${task.label}`,task.alarm,'alarm');},ms));
+      armed++;
     }
-
-    function msUntil(timeStr) {
-      const target = parseTime(timeStr);
-      return target - Date.now();
-    }
-
-    function formatTime12(h, m) {
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      const hh = h % 12 || 12;
-      const mm = String(m).padStart(2, '0');
-      return `${hh}:${mm} ${ampm}`;
-    }
-
-    function log(msg, type = '') {
-      const area = document.getElementById('log-area');
-      const now = new Date();
-      const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-      const div = document.createElement('div');
-      div.innerHTML = `<span class="log-time">[${ts}]</span> <span class="${type}">${msg}</span>`;
-      area.insertBefore(div, area.firstChild);
-      if (area.children.length > 20) area.removeChild(area.lastChild);
-    }
-
-    function setStatus(text, type = '') {
-      document.getElementById('status-text').textContent = text;
-      const dot = document.getElementById('status-dot');
-      dot.className = 'status-dot ' + type;
-    }
-
-    function showToast(title, body) {
-      document.getElementById('toast-title').textContent = title;
-      document.getElementById('toast-body').textContent = body;
-      const t = document.getElementById('toast');
-      t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), 6000);
-    }
-
-    // ═══════════════════════════════════════════════
-    // NOTIFICATIONS
-    // ═══════════════════════════════════════════════
-    async function requestPermission() {
-      if (!('Notification' in window)) {
-        setStatus('Notifications not supported in this browser.', 'warn');
-        log('ERROR: Notifications API not available.', 'log-fire');
-        alert('Your browser does not support notifications.\nTry Chrome on Android or Safari on iOS 16.4+');
-        return;
-      }
-
-      const perm = await Notification.requestPermission();
-
-      if (perm === 'granted') {
-        notificationsEnabled = true;
-        document.getElementById('enable-btn').textContent = '✅ NOTIFICATIONS ACTIVE';
-        document.getElementById('enable-btn').disabled = true;
-        setStatus('ARMED. Alarms scheduled for today.', 'active');
-        log('Permission granted. Scheduling alarms...', 'log-fire');
-        scheduleAlarms();
-      } else {
-        setStatus('Permission denied. Enable in browser settings.', 'warn');
-        log('Permission DENIED. Go to browser settings → allow notifications.', 'log-fire');
-        alert('Notifications blocked!\n\nGo to your browser Settings → Site Settings → Notifications → Allow this site.');
+    if(task.penalty&&task.penalty.length>0){
+      const pms=i<SCHED.length-1?msUntil(SCHED[i+1].time):msUntil(task.time)+90*60000;
+      if(pms>0){
+        handles.push(setTimeout(()=>{
+          const d2=load();const dy=d2.days[todayStr];
+          if(dy&&dy[task.id]==='pending'){
+            dy[task.id]='failed';
+            d2.stats.totalXP=Math.max(0,(d2.stats.totalXP||0)-25);
+            save(d2);data=d2;
+            renderAll();flashT(task.id,'r');
+            xpFloat(-25,document.getElementById('ti-'+task.id));
+            fireN(`💀 PENALTY: ${task.label}`,task.penalty+' (−25 XP)','penalty');
+            log(`PENALTY: ${task.label} — FAILED, −25 XP`,'lf');
+          }
+        },pms));
       }
     }
-
-    function fireNotification(item) {
-      if (!notificationsEnabled) return;
-
-      // In-app toast always
-      showToast(item.title, item.msg);
-      log(`ALARM FIRED: ${item.label}`, 'log-fire');
-
-      // OS notification
-      try {
-        const n = new Notification(item.title, {
-          body: item.msg,
-          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230a0a0f"/><text y=".9em" font-size="80">⚡</text></svg>',
-          badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23ff003c"/><text y=".9em" font-size="80">!</text></svg>',
-          vibrate: [200, 100, 200, 100, 400],
-          requireInteraction: true,
-          tag: 'levelup-alarm-' + item.time,
-        });
-        n.onclick = () => { window.focus(); n.close(); };
-      } catch(e) {
-        log('Notification display error: ' + e.message, 'log-fire');
-      }
-    }
-
-    function scheduleAlarms() {
-      // Clear existing
-      scheduledTimeouts.forEach(clearTimeout);
-      scheduledTimeouts = [];
-
-      let scheduled = 0;
-      SCHEDULE.forEach(item => {
-        const ms = msUntil(item.time);
-        if (ms > 0 && ms < 24 * 60 * 60 * 1000) {
-          const tid = setTimeout(() => fireNotification(item), ms);
-          scheduledTimeouts.push(tid);
-          scheduled++;
-          const mins = Math.round(ms / 60000);
-          log(`Scheduled: ${item.label} in ${mins} min`);
-        }
-      });
-
-      log(`${scheduled} alarms armed for today.`, 'log-fire');
-
-      if (scheduled === 0) {
-        setStatus("All tasks done for today. Sleep. Reset tomorrow.", 'active');
-        log('All today\'s alarms already passed. See you tomorrow.', 'log-fire');
-      }
-    }
-
-    function sendTestNotification() {
-      if (!notificationsEnabled) {
-        alert('Activate notifications first!');
-        return;
-      }
-      const testItems = [
-        { title: "⚡ TEST ALARM", msg: "If you can read this, the system is armed. You have no more excuses. GO WORK.", label: "TEST" },
-      ];
-      fireNotification(testItems[0]);
-      log('Test notification fired.', 'log-fire');
-    }
-
-    // ═══════════════════════════════════════════════
-    // LIVE CLOCK + TASK RENDERING
-    // ═══════════════════════════════════════════════
-    function getCurrentTask() {
-      const now = new Date();
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-
-      let currentIdx = -1;
-      for (let i = 0; i < SCHEDULE.length; i++) {
-        const [h, m] = SCHEDULE[i].time.split(':').map(Number);
-        const taskMins = h * 60 + m;
-        if (nowMins >= taskMins) currentIdx = i;
-        else break;
-      }
-      return currentIdx;
-    }
-
-    function getNextTask() {
-      const now = new Date();
-      const nowMins = now.getHours() * 60 + now.getMinutes();
-      for (let i = 0; i < SCHEDULE.length; i++) {
-        const [h, m] = SCHEDULE[i].time.split(':').map(Number);
-        if (h * 60 + m > nowMins) return { task: SCHEDULE[i], idx: i };
-      }
-      return null;
-    }
-
-    function renderTasks() {
-      const list = document.getElementById('task-list');
-      const currentIdx = getCurrentTask();
-      const next = getNextTask();
-
-      let html = '';
-      SCHEDULE.forEach((item, i) => {
-        let cls = 'upcoming';
-        let badge = '';
-        if (i < currentIdx) cls = 'done';
-        else if (i === currentIdx) { cls = 'current'; badge = '<span class="current-badge">NOW</span>'; }
-
-        const [h, m] = item.time.split(':').map(Number);
-        const t12 = formatTime12(h, m);
-
-        html += `<div class="task-item ${cls}">
-          <span class="task-emoji">${item.emoji}</span>
-          <div style="flex:1">
-            <div class="task-time">${t12}</div>
-            <div class="task-label">${item.label}</div>
-          </div>
-          ${badge}
-        </div>`;
-      });
-
-      list.innerHTML = html;
-
-      // Progress
-      const done = Math.max(0, currentIdx);
-      const pct = Math.round((done / SCHEDULE.length) * 100);
-      document.getElementById('progress-fill').style.width = pct + '%';
-      document.getElementById('progress-pct').textContent = pct + '%';
-
-      // Next task
-      if (next) {
-        document.getElementById('next-task-name').textContent = next.task.label;
-        const [h, m] = next.task.time.split(':').map(Number);
-        document.getElementById('next-task-time').textContent = formatTime12(h, m);
-      } else {
-        document.getElementById('next-task-name').textContent = 'All done';
-        document.getElementById('next-task-time').textContent = '—';
-      }
-    }
-
-    function updateClock() {
-      const now = new Date();
-      const h = String(now.getHours()).padStart(2,'0');
-      const m = String(now.getMinutes()).padStart(2,'0');
-      const s = String(now.getSeconds()).padStart(2,'0');
-      document.getElementById('live-clock').textContent = `${h}:${m}:${s}`;
-
-      const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-      const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-      document.getElementById('live-date').textContent =
-        `${days[now.getDay()]} — ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
-    }
-
-    // ═══════════════════════════════════════════════
-    // INIT
-    // ═══════════════════════════════════════════════
-    function init() {
-      updateClock();
-      renderTasks();
-
-      setInterval(() => {
-        updateClock();
-        renderTasks();
-      }, 1000);
-
-      // Check permission state
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          notificationsEnabled = true;
-          document.getElementById('enable-btn').textContent = '✅ NOTIFICATIONS ACTIVE';
-          document.getElementById('enable-btn').disabled = true;
-          setStatus('ARMED. Re-scheduling alarms...', 'active');
-          scheduleAlarms();
-        } else if (Notification.permission === 'denied') {
-          setStatus('Notifications blocked. Check browser settings.', 'warn');
-          log('Notifications BLOCKED. Enable in site settings.', 'log-fire');
-        } else {
-          setStatus('Tap ACTIVATE to enable notifications.', '');
-          log('Waiting for activation...');
-        }
-      } else {
-        setStatus('Notifications not supported here.', 'warn');
-        log('ERROR: Notification API missing. Use Chrome or Safari 16.4+', 'log-fire');
-      }
-
-      // Register service worker for PWA
-      if ('serviceWorker' in navigator) {
-        // Inline service worker
-        const swCode = `
-          self.addEventListener('install', () => self.skipWaiting());
-          self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
-          self.addEventListener('notificationclick', function(e) {
-            e.notification.close();
-            e.waitUntil(clients.openWindow('/'));
-          });
-        `;
-        const blob = new Blob([swCode], { type: 'application/javascript' });
-        const swUrl = URL.createObjectURL(blob);
-        navigator.serviceWorker.register(swUrl, { scope: '/' })
-          .then(() => log('Service worker registered.'))
-          .catch(e => log('SW error: ' + e.message, 'log-fire'));
-      }
-    }
-
-    window.addEventListener('DOMContentLoaded', init);
-  </script>
-
-  <!-- PWA Manifest (inline) -->
-  <script>
-    const manifest = {
-      name: "LEVEL UP — Alarm System",
-      short_name: "LEVEL UP",
-      description: "2-Month Level Up Alarm System",
-      start_url: "./",
-      display: "standalone",
-      background_color: "#0a0a0f",
-      theme_color: "#0a0a0f",
-      icons: [
-        {
-          src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230a0a0f'/><text y='160' font-size='160'>⚡</text></svg>",
-          sizes: "192x192",
-          type: "image/svg+xml"
-        }
-      ]
-    };
-    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('link');
-    link.rel = 'manifest';
-    link.href = url;
-    document.head.appendChild(link);
-  </script>
+  });
+  log(`${armed} alarms armed.`,'lg');
+}
+ 
+function markDone(id){
+  data=load();const dy=initDay(data,todayStr);
+  if(dy[id]==='complete')return;
+  const task=SCHED.find(t=>t.id===id);if(!task)return;
+  const wasFail=dy[id]==='failed';
+  dy[id]='complete';
+  const xpGain=wasFail?Math.floor(task.xp*.5):task.xp;
+  const pXP=data.stats.totalXP||0;const pL=getLevel(pXP);
+  data.stats.totalXP=pXP+xpGain;
+  const nL=getLevel(data.stats.totalXP);
+  const allDone=SCHED.every(t=>dy[t.id]==='complete');
+  if(allDone){data.stats.totalXP+=300;updStreak();fireN('🏆 ALL DONE!','Every task complete. +300 bonus XP. Streak extended.','complete');log('ALL TASKS DONE! +300 BONUS XP','lg');}
+  save(data);renderAll();flashT(id,'g');
+  xpFloat(xpGain,document.getElementById('ti-'+id));
+  fireN(`✅ DONE: ${task.label}`,`+${xpGain} XP${wasFail?' (partial, task was already failed)':''}.`,'complete');
+  log(`COMPLETE: ${task.label} (+${xpGain} XP)`,'lg');
+  if(nL>pL)lvlUp(nL);
+}
+ 
+function markUndo(id){
+  data=load();const dy=initDay(data,todayStr);
+  if(dy[id]!=='complete')return;
+  const task=SCHED.find(t=>t.id===id);if(!task)return;
+  dy[id]='pending';data.stats.totalXP=Math.max(0,(data.stats.totalXP||0)-task.xp);
+  save(data);renderAll();log(`UNDONE: ${task.label} (−${task.xp} XP)`,'ly');
+}
+ 
+function updStreak(){
+  const today=new Date();const yesterday=new Date(today);yesterday.setDate(yesterday.getDate()-1);
+  const yk=`${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+  const last=data.stats.lastDate;
+  if(last===yk||last===null)data.stats.streak=(data.stats.streak||0)+1;
+  else if(last!==todayStr)data.stats.streak=1;
+  data.stats.bestStreak=Math.max(data.stats.streak,data.stats.bestStreak||0);
+  data.stats.lastDate=todayStr;save(data);
+}
+ 
+function renderAll(){
+  data=load();const dy=initDay(data,todayStr);const nm=nowM();
+  let done=0,fail=0,pend=0;
+  SCHED.forEach(t=>{const s=dy[t.id]||'pending';if(s==='complete')done++;else if(s==='failed')fail++;else pend++;});
+  document.getElementById('ctd').textContent=done;
+  document.getElementById('ctf').textContent=fail;
+  document.getElementById('ctp').textContent=pend;
+  const pct=Math.round((done/SCHED.length)*100);
+  document.getElementById('ppct').textContent=pct+'%';
+  document.getElementById('pf').style.width=pct+'%';
+ 
+  const tXP=data.stats.totalXP||0;const{cur,next}=getLvlInfo(tXP);
+  document.getElementById('rxp').textContent=tXP;
+  document.getElementById('rlv').textContent=cur.l;
+  document.getElementById('rrank').textContent=cur.n;
+  document.getElementById('rst').textContent=data.stats.streak||0;
+  document.getElementById('rbest').textContent='BEST: '+(data.stats.bestStreak||0);
+  if(next){
+    const xpIn=tXP-cur.xp;const xpN=next.xp-cur.xp;
+    document.getElementById('xf').style.width=Math.min(100,Math.round((xpIn/xpN)*100))+'%';
+    document.getElementById('xpnext').textContent=`${xpIn}/${xpN} XP → LVL ${next.l}`;
+  } else {document.getElementById('xf').style.width='100%';document.getElementById('xpnext').textContent='MAX LEVEL';}
+ 
+  const curIdx=findCurIdx(nm);
+  let html='';
+  SCHED.forEach((task,i)=>{
+    const s=dy[task.id]||'pending';
+    const isNow=i===curIdx;
+    let cls='tup',bc='bup',bt='QUEUED';
+    if(s==='complete'){cls='tdone';bc='bdone';bt='✓ DONE';}
+    else if(s==='failed'){cls='tfail';bc='bfail';bt='✗ FAIL';}
+    else if(isNow){cls='tnow';bc='bnow';bt='NOW';}
+    const xpL=s==='complete'?`+${task.xp} XP ✓`:`${task.xp} XP`;
+    let btn='';
+    if(s==='pending'){btn=`<button class="tbtn bcomp" onclick="markDone('${task.id}')">DONE ✓</button>`;}
+    else if(s==='complete'){btn=`<button class="tbtn bundo" onclick="markUndo('${task.id}')">UNDO</button>`;}
+    else if(s==='failed'){btn=`<button class="tbtn bredo" onclick="markDone('${task.id}')">REDO ✓</button>`;}
+    html+=`<div class="ti ${cls}" id="ti-${task.id}"><div class="tmain"><div class="ttc"><div class="ttime">${fmt12(task.time)}</div><div class="temoji">${task.emoji}</div></div><div class="tbody"><div class="tlbl">${task.label}</div><div class="txp">${xpL}</div></div><div class="tright"><span class="badge ${bc}">${bt}</span>${btn}</div></div></div>`;
+  });
+  document.getElementById('tl').innerHTML=html;
+}
+ 
+function findCurIdx(nm){let idx=-1;for(let i=0;i<SCHED.length;i++){if(parseHM(SCHED[i].time)<=nm)idx=i;else break;}return idx;}
+ 
+function flashT(id,type){
+  const el=document.getElementById('ti-'+id);if(!el)return;
+  el.classList.remove('fgreen','fred');void el.offsetWidth;
+  el.classList.add(type==='g'?'fgreen':'fred');
+  setTimeout(()=>el.classList.remove('fgreen','fred'),700);
+}
+ 
+function xpFloat(val,el){
+  const d=document.createElement('div');
+  const isGain=val>0;d.className='xpf '+(isGain?'gn':'ls');
+  d.textContent=(isGain?'+':'')+val+' XP';
+  if(el){const r=el.getBoundingClientRect();d.style.left=(r.left+r.width/2-30)+'px';d.style.top=(r.top+window.scrollY)+'px';}
+  else{d.style.left='50%';d.style.top='40%';}
+  document.body.appendChild(d);setTimeout(()=>d.remove(),1600);
+}
+ 
+function lvlUp(l){
+  const info=LEVELS.find(v=>v.l===l)||{n:'???'};
+  document.getElementById('lvsub').textContent=`LEVEL ${l} — ${info.n}`;
+  document.getElementById('lvo').style.display='flex';
+  for(let i=0;i<14;i++){
+    const s=document.createElement('div');s.className='spark';
+    s.style.left=Math.random()*100+'vw';s.style.top=Math.random()*100+'vh';
+    s.textContent=['⚡','✨','💥','🔥','⭐'][Math.floor(Math.random()*5)];
+    document.body.appendChild(s);setTimeout(()=>s.remove(),1100);
+  }
+}
+function closeLvl(){document.getElementById('lvo').style.display='none';}
+ 
+let tTimer=null;
+function toast(title,body,ok=false){
+  const t=document.getElementById('toast');
+  document.getElementById('ttl').textContent=title;document.getElementById('tbody').textContent=body;
+  t.className='toast'+(ok?' tok':'');t.classList.add('show');
+  clearTimeout(tTimer);tTimer=setTimeout(()=>t.classList.remove('show'),ok?4000:6000);
+}
+ 
+function setSt(msg,type=''){
+  document.getElementById('stmsg').textContent=msg;
+  const s=document.getElementById('st');s.className='st '+(type==='ok'?'ok':type==='warn'?'warn':'');
+}
+ 
+function log(msg,cls=''){
+  const a=document.getElementById('log');const n=new Date();
+  const ts=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
+  const d=document.createElement('div');d.innerHTML=`<span class="lt">[${ts}]</span> <span class="${cls}">${msg}</span>`;
+  a.insertBefore(d,a.firstChild);if(a.children.length>30)a.removeChild(a.lastChild);
+}
+ 
+function testN(){
+  if(!notifOn){toast('ACTIVATE FIRST','Tap the ACTIVATE button first!',false);return;}
+  const opts=[
+    {t:'⚡ SYSTEM TEST',b:'Alarms active. You have zero excuses now. None.'},
+    {t:'💀 PENALTY TEST',b:'This is what a missed task looks like. −25 XP. Terrifying, right?'},
+    {t:'⚒️ REMINDER',b:'Are you testing this instead of working? Be honest with yourself.'},
+  ];
+  const o=opts[Math.floor(Math.random()*opts.length)];fireN(o.t,o.b,'alarm');
+}
+ 
+function resetDay(){
+  if(!confirm('Reset ALL of today\'s task progress? Cannot be undone.'))return;
+  data=load();delete data.days[todayStr];save(data);data=load();initDay(data,todayStr);save(data);
+  renderAll();log('Today reset. Fresh start.','ly');toast('TODAY RESET',"All tasks cleared. Let's go.",true);
+}
+ 
+function updClock(){
+  const n=new Date();
+  document.getElementById('clk').textContent=`${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}`;
+  const days=['SUN','MON','TUE','WED','THU','FRI','SAT'];const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  document.getElementById('clk-date').textContent=`${days[n.getDay()]} ${months[n.getMonth()]} ${n.getDate()}, ${n.getFullYear()}`;
+  document.getElementById('dbadge').textContent=`${n.getDate()} ${months[n.getMonth()]} ${n.getFullYear()}`;
+  const nm=nowM();let nxt=null;for(const t of SCHED){if(parseHM(t.time)>nm){nxt=t;break;}}
+  document.getElementById('cn-val').textContent=nxt?`${nxt.emoji} ${nxt.label} @ ${fmt12(nxt.time)}`:'All done today ✓';
+}
+ 
+function midCheck(){const k=todayKey();if(k!==todayStr){todayStr=k;data=load();initDay(data,todayStr);save(data);renderAll();if(notifOn)schedAll();log('NEW DAY. Fresh schedule.','lg');}}
+ 
+(function boot(){
+  data=load();initDay(data,todayStr);save(data);
+  updClock();renderAll();
+  setInterval(updClock,1000);setInterval(()=>{renderAll();midCheck();},30000);
+  if('Notification' in window){
+    if(Notification.permission==='granted'){
+      notifOn=true;const b=document.getElementById('abtn');b.textContent='✅ ALARMS ARMED';b.disabled=true;
+      setSt('ARMED. Rescheduling alarms...','ok');schedAll();log('Permission already granted. Alarms scheduled.','lg');
+    } else if(Notification.permission==='denied'){
+      setSt('Notifications BLOCKED. Enable in browser settings.','warn');log('Blocked. Site settings → notifications.','lf');
+    } else {setSt('Tap ACTIVATE to arm the alarm system.','');}
+  } else {setSt('Notifications not supported. Use Chrome/Safari 16.4+.','warn');}
+  // SW for installability
+  if('serviceWorker' in navigator){
+    try{
+      const sw=new Blob([`self.addEventListener('install',()=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));`],{type:'application/javascript'});
+      navigator.serviceWorker.register(URL.createObjectURL(sw)).then(()=>log('PWA SW ready.')).catch(()=>{});
+    }catch(e){}
+  }
+  // Manifest
+  try{
+    const mf={name:'LEVEL UP SYSTEM',short_name:'LEVEL UP',start_url:'./',display:'standalone',background_color:'#06060f',theme_color:'#06060f',icons:[{src:"data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%2306060f'/><text y='160' font-size='160'>⚡</text></svg>",sizes:'192x192',type:'image/svg+xml'}]};
+    const bl=new Blob([JSON.stringify(mf)],{type:'application/json'});
+    const lk=document.createElement('link');lk.rel='manifest';lk.href=URL.createObjectURL(bl);document.head.appendChild(lk);
+  }catch(e){}
+  log('System v2.0 boot complete.','lg');
+})();
+</script>
 </body>
 </html>
+ 
