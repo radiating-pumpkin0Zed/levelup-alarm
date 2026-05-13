@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="LEVEL UP" />
+  <title>LEVEL UP — Alarm System</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg: #0a0a0f;
+      --surface: #0f0f1a;
+      --card: #13131f;
+      --border: #1e1e3a;
+      --accent: #ff003c;
+      --accent2: #00ffe1;
+      --accent3: #ff6b00;
+      --text: #e0e0ff;
+      --muted: #5a5a8a;
+      --glow-red: 0 0 20px rgba(255,0,60,0.5);
+      --glow-cyan: 0 0 20px rgba(0,255,225,0.4);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Scanline overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Noise texture */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9998;
+      opacity: 0.4;
+    }
+
+    .header {
+      padding: 32px 20px 0;
+      text-align: center;
+      position: relative;
+    }
+
+    .header-glitch {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(48px, 15vw, 80px);
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      text-shadow: var(--glow-red), 3px 0 0 rgba(0,255,225,0.4), -3px 0 0 rgba(255,107,0,0.4);
+      animation: glitch 4s infinite;
+      line-height: 1;
+    }
+
+    @keyframes glitch {
+      0%, 90%, 100% { transform: translate(0); clip-path: none; }
+      91% { transform: translate(-2px, 1px); }
+      92% { transform: translate(2px, -1px); clip-path: polygon(0 30%, 100% 30%, 100% 55%, 0 55%); }
+      93% { transform: translate(0); clip-path: none; }
+      95% { transform: translate(1px, 0); }
+      96% { transform: translate(-1px, 0); }
+    }
+
+    .header-sub {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      color: var(--accent2);
+      letter-spacing: 0.3em;
+      margin-top: 4px;
+      text-shadow: var(--glow-cyan);
+    }
+
+    .clock-display {
+      text-align: center;
+      margin: 24px 20px 0;
+      padding: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--accent2);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .clock-display::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+      animation: scan 3s linear infinite;
+    }
+
+    @keyframes scan {
+      0% { opacity: 0; transform: translateX(-100%); }
+      50% { opacity: 1; }
+      100% { opacity: 0; transform: translateX(100%); }
+    }
+
+    #live-clock {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(36px, 12vw, 60px);
+      font-weight: 900;
+      color: var(--accent2);
+      text-shadow: var(--glow-cyan);
+      letter-spacing: 0.05em;
+    }
+
+    #live-date {
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.2em;
+      margin-top: 4px;
+    }
+
+    #next-task-display {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--accent3);
+      letter-spacing: 0.1em;
+    }
+
+    #next-task-display span {
+      color: var(--text);
+    }
+
+    /* STATUS */
+    .status-bar {
+      margin: 16px 20px 0;
+      padding: 12px 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1.5s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .status-dot.active { background: #00ff88; box-shadow: 0 0 8px #00ff88; }
+    .status-dot.warn { background: var(--accent3); box-shadow: 0 0 8px var(--accent3); }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(0.7); }
+    }
+
+    #status-text { color: var(--text); }
+
+    /* ENABLE BUTTON */
+    .enable-btn {
+      display: block;
+      width: calc(100% - 40px);
+      margin: 16px 20px 0;
+      padding: 18px;
+      background: transparent;
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      font-family: 'Orbitron', monospace;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+      text-transform: uppercase;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.2s;
+    }
+
+    .enable-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--accent);
+      transform: translateX(-100%);
+      transition: transform 0.2s;
+      z-index: -1;
+    }
+
+    .enable-btn:hover::before, .enable-btn:active::before { transform: translateX(0); }
+    .enable-btn:hover, .enable-btn:active { color: #0a0a0f; }
+
+    .enable-btn:disabled {
+      border-color: #00ff88;
+      color: #00ff88;
+      cursor: default;
+    }
+
+    .enable-btn:disabled::before { display: none; }
+
+    /* SECTION */
+    .section {
+      margin: 20px 20px 0;
+    }
+
+    .section-title {
+      font-family: 'Orbitron', monospace;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.35em;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::before {
+      content: '//';
+      color: var(--accent);
+    }
+
+    /* TASK LIST */
+    .task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 2px solid transparent;
+      transition: all 0.3s;
+      position: relative;
+    }
+
+    .task-item.current {
+      border-left-color: var(--accent2);
+      background: rgba(0,255,225,0.05);
+      box-shadow: var(--glow-cyan);
+    }
+
+    .task-item.done {
+      border-left-color: var(--muted);
+      opacity: 0.45;
+    }
+
+    .task-item.upcoming {
+      border-left-color: var(--border);
+    }
+
+    .task-time {
+      font-family: 'Orbitron', monospace;
+      font-size: 11px;
+      color: var(--accent2);
+      min-width: 48px;
+      font-weight: 700;
+    }
+
+    .task-item.done .task-time { color: var(--muted); }
+
+    .task-label {
+      font-size: 13px;
+      color: var(--text);
+      flex: 1;
+      line-height: 1.3;
+    }
+
+    .task-item.done .task-label {
+      text-decoration: line-through;
+      color: var(--muted);
+    }
+
+    .task-emoji {
+      font-size: 16px;
+    }
+
+    .current-badge {
+      font-family: 'Orbitron', monospace;
+      font-size: 8px;
+      background: var(--accent2);
+      color: #000;
+      padding: 2px 6px;
+      letter-spacing: 0.1em;
+      font-weight: 700;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* PROGRESS */
+    .progress-section {
+      margin: 0 20px;
+      padding: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      letter-spacing: 0.1em;
+    }
+
+    #progress-pct { color: var(--accent3); font-weight: bold; }
+
+    .progress-bar {
+      height: 6px;
+      background: var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width 1s ease;
+      box-shadow: 0 0 10px var(--accent);
+    }
+
+    /* LOG */
+    #log-area {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.8;
+      max-height: 120px;
+      overflow-y: auto;
+      padding: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    #log-area div { border-bottom: 1px solid rgba(255,255,255,0.03); padding: 2px 0; }
+    #log-area .log-time { color: var(--accent2); }
+    #log-area .log-fire { color: var(--accent); }
+
+    /* TEST BUTTON */
+    .test-btn {
+      display: block;
+      width: calc(100% - 40px);
+      margin: 0 20px;
+      padding: 12px;
+      background: transparent;
+      border: 1px dashed var(--muted);
+      color: var(--muted);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 12px;
+      cursor: pointer;
+      letter-spacing: 0.15em;
+      transition: all 0.2s;
+    }
+
+    .test-btn:hover, .test-btn:active {
+      border-color: var(--accent3);
+      color: var(--accent3);
+    }
+
+    /* INSTALL GUIDE */
+    .install-guide {
+      margin: 0 20px;
+      padding: 16px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-top: 2px solid var(--accent3);
+    }
+
+    .install-guide p {
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .install-guide strong { color: var(--accent3); }
+    .install-guide em { color: var(--accent2); font-style: normal; }
+
+    /* MANIFEST HIDDEN */
+    .bottom-pad { height: 40px; }
+
+    /* NOTIFICATION TOAST */
+    #toast {
+      position: fixed;
+      bottom: 24px;
+      left: 20px; right: 20px;
+      padding: 16px;
+      background: var(--card);
+      border: 1px solid var(--accent);
+      border-left: 4px solid var(--accent);
+      font-size: 13px;
+      color: var(--text);
+      z-index: 99999;
+      transform: translateY(120%);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: var(--glow-red);
+    }
+
+    #toast.show { transform: translateY(0); }
+    #toast-title { color: var(--accent); font-family: 'Orbitron', monospace; font-size: 11px; margin-bottom: 4px; letter-spacing: 0.1em; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="header-glitch">LEVEL UP</div>
+    <div class="header-sub">POST-EXAM ARC // ALARM SYSTEM v1.0</div>
+  </div>
+
+  <div class="clock-display">
+    <div id="live-clock">00:00:00</div>
+    <div id="live-date">LOADING...</div>
+    <div id="next-task-display">NEXT: <span id="next-task-name">—</span> @ <span id="next-task-time">—</span></div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-dot" id="status-dot"></div>
+    <div id="status-text">Initializing alarm system...</div>
+  </div>
+
+  <button class="enable-btn" id="enable-btn" onclick="requestPermission()">
+    ⚡ ACTIVATE NOTIFICATIONS
+  </button>
+
+  <div style="height:16px"></div>
+
+  <div style="margin: 0 20px 16px;">
+    <div class="progress-label">
+      <span>TODAY'S PROGRESS</span>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">TODAY'S MISSION TIMELINE</div>
+    <div class="task-list" id="task-list"></div>
+  </div>
+
+  <div style="height:16px"></div>
+
+  <button class="test-btn" onclick="sendTestNotification()">
+    [ TEST: FIRE A NOTIFICATION NOW ]
+  </button>
+
+  <div style="height:16px"></div>
+
+  <div class="section">
+    <div class="section-title">SYSTEM LOG</div>
+    <div id="log-area"><div><span class="log-time">[BOOT]</span> System online. Waiting for activation...</div></div>
+  </div>
+
+  <div style="height:16px"></div>
+
+  <div class="section">
+    <div class="section-title">INSTALLATION GUIDE</div>
+    <div class="install-guide">
+      <p>
+        <strong>Android Chrome:</strong><br/>
+        Tap ⋮ menu → <em>"Add to Home Screen"</em> → Install<br/><br/>
+        <strong>iPhone Safari:</strong><br/>
+        Tap Share ↑ → <em>"Add to Home Screen"</em><br/><br/>
+        <strong>Then:</strong> Open the app from home screen, tap <em>ACTIVATE NOTIFICATIONS</em>, and leave app running in background. Keep screen on or phone charged.<br/><br/>
+        <strong>NOTE:</strong> For best results, keep this tab open. On Android, it can run in background if added to home screen.
+      </p>
+    </div>
+  </div>
+
+  <div class="bottom-pad"></div>
+
+  <div id="toast">
+    <div id="toast-title">ALARM</div>
+    <div id="toast-body">Time to work.</div>
+  </div>
+
+  <script>
+    // ═══════════════════════════════════════════════
+    // SCHEDULE — Based on your exact timetable PDF
+    // ═══════════════════════════════════════════════
+    const SCHEDULE = [
+      {
+        time: "07:00", emoji: "🔴",
+        label: "WAKE UP",
+        msg: "GET UP. RIGHT NOW. Your alarm doesn't negotiate. Neither does failure.",
+        title: "⚡ WAKE UP — NO SNOOZE"
+      },
+      {
+        time: "07:15", emoji: "🏃",
+        label: "Exercise / Walk / Stretching",
+        msg: "Move your body. You cannot code with a corpse brain. 15 minutes. GO.",
+        title: "🏃 MOVE YOUR BODY"
+      },
+      {
+        time: "07:45", emoji: "🍳",
+        label: "Breakfast + Plan Today",
+        msg: "Eat. Write down ONE goal for today. Not ten. ONE. Pick the hardest one.",
+        title: "🍳 FUEL UP + PLAN"
+      },
+      {
+        time: "08:15", emoji: "🧠",
+        label: "DSA / LeetCode [1.5 hr]",
+        msg: "DEEP WORK BEGINS. Arrays, Strings, Hashing. Phone goes face-down. START.",
+        title: "🧠 DSA — DEEP WORK"
+      },
+      {
+        time: "10:00", emoji: "☕",
+        label: "Break (30 min)",
+        msg: "Earned break. Do NOT open Instagram. You get 30 minutes. Not 90.",
+        title: "☕ BREAK — 30 MIN ONLY"
+      },
+      {
+        time: "10:30", emoji: "💻",
+        label: "Web Development [2.5 hr]",
+        msg: "Open your editor. NOT YouTube. Code → Break → Code. Build something real today.",
+        title: "💻 WEB DEV — BUILD TIME"
+      },
+      {
+        time: "13:00", emoji: "🍱",
+        label: "Lunch + Rest [1 hr]",
+        msg: "Eat properly. Rest. No doomscrolling. Your brain is not a landfill.",
+        title: "🍱 LUNCH BREAK"
+      },
+      {
+        time: "14:00", emoji: "🔤",
+        label: "English + Typing Practice",
+        msg: "Monkeytype is open. No excuses. Think in English. Speak thoughts out loud. GO.",
+        title: "⌨️ TYPING + ENGLISH"
+      },
+      {
+        time: "15:00", emoji: "🎨",
+        label: "Creative Skill [Editing / Pixel Art]",
+        msg: "ONE skill. Not five. Create one thing today. Even small. Make it real.",
+        title: "🎨 CREATE SOMETHING"
+      },
+      {
+        time: "16:00", emoji: "🌤️",
+        label: "Free Time",
+        msg: "You earned this. Decompress. Don't plan new ambitions during free time. Just exist.",
+        title: "🌤️ FREE TIME"
+      },
+      {
+        time: "17:00", emoji: "⚒️",
+        label: "Project Building [2 hr]",
+        msg: "BUILD. Not watch. Not plan. Write actual code. Push to GitHub. Ship or die.",
+        title: "⚒️ PROJECT TIME — SHIP IT"
+      },
+      {
+        time: "19:00", emoji: "🍜",
+        label: "Dinner + Rest",
+        msg: "You've been building. Eat. Rest your eyes. Come back stronger in 1 hour.",
+        title: "🍜 DINNER BREAK"
+      },
+      {
+        time: "20:00", emoji: "📖",
+        label: "Revision / Light Coding [1.5 hr]",
+        msg: "Review what you learned today. Fix bugs. Read docs. Light but consistent.",
+        title: "📖 REVISION TIME"
+      },
+      {
+        time: "21:30", emoji: "😮‍💨",
+        label: "Chill Time",
+        msg: "Wind down. Anime, music, walk. You worked hard. You earned silence.",
+        title: "😮‍💨 CHILL OUT"
+      },
+      {
+        time: "22:30", emoji: "📋",
+        label: "Daily Evaluation",
+        msg: "Write 3 things: What did I complete? What distracted me? What improved? Be honest.",
+        title: "📋 DAILY REVIEW"
+      },
+      {
+        time: "23:00", emoji: "🌙",
+        label: "SLEEP PREP — Screens Off",
+        msg: "Put the phone down. Close the laptop. Your future self is built while you sleep.",
+        title: "🌙 SLEEP NOW — REST IS WORK"
+      },
+      {
+        time: "23:30", emoji: "💤",
+        label: "LIGHTS OUT",
+        msg: "IF YOU'RE STILL AWAKE — what are you doing. Sleep is not optional. CLOSE YOUR EYES.",
+        title: "💤 SERIOUSLY. SLEEP."
+      },
+    ];
+
+    // ═══════════════════════════════════════════════
+    // STATE
+    // ═══════════════════════════════════════════════
+    let notificationsEnabled = false;
+    let scheduledTimeouts = [];
+    let tickerInterval = null;
+
+    // ═══════════════════════════════════════════════
+    // UTILS
+    // ═══════════════════════════════════════════════
+    function parseTime(timeStr) {
+      const [h, m] = timeStr.split(':').map(Number);
+      const now = new Date();
+      const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m, 0);
+      return t;
+    }
+
+    function msUntil(timeStr) {
+      const target = parseTime(timeStr);
+      return target - Date.now();
+    }
+
+    function formatTime12(h, m) {
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const hh = h % 12 || 12;
+      const mm = String(m).padStart(2, '0');
+      return `${hh}:${mm} ${ampm}`;
+    }
+
+    function log(msg, type = '') {
+      const area = document.getElementById('log-area');
+      const now = new Date();
+      const ts = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      const div = document.createElement('div');
+      div.innerHTML = `<span class="log-time">[${ts}]</span> <span class="${type}">${msg}</span>`;
+      area.insertBefore(div, area.firstChild);
+      if (area.children.length > 20) area.removeChild(area.lastChild);
+    }
+
+    function setStatus(text, type = '') {
+      document.getElementById('status-text').textContent = text;
+      const dot = document.getElementById('status-dot');
+      dot.className = 'status-dot ' + type;
+    }
+
+    function showToast(title, body) {
+      document.getElementById('toast-title').textContent = title;
+      document.getElementById('toast-body').textContent = body;
+      const t = document.getElementById('toast');
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 6000);
+    }
+
+    // ═══════════════════════════════════════════════
+    // NOTIFICATIONS
+    // ═══════════════════════════════════════════════
+    async function requestPermission() {
+      if (!('Notification' in window)) {
+        setStatus('Notifications not supported in this browser.', 'warn');
+        log('ERROR: Notifications API not available.', 'log-fire');
+        alert('Your browser does not support notifications.\nTry Chrome on Android or Safari on iOS 16.4+');
+        return;
+      }
+
+      const perm = await Notification.requestPermission();
+
+      if (perm === 'granted') {
+        notificationsEnabled = true;
+        document.getElementById('enable-btn').textContent = '✅ NOTIFICATIONS ACTIVE';
+        document.getElementById('enable-btn').disabled = true;
+        setStatus('ARMED. Alarms scheduled for today.', 'active');
+        log('Permission granted. Scheduling alarms...', 'log-fire');
+        scheduleAlarms();
+      } else {
+        setStatus('Permission denied. Enable in browser settings.', 'warn');
+        log('Permission DENIED. Go to browser settings → allow notifications.', 'log-fire');
+        alert('Notifications blocked!\n\nGo to your browser Settings → Site Settings → Notifications → Allow this site.');
+      }
+    }
+
+    function fireNotification(item) {
+      if (!notificationsEnabled) return;
+
+      // In-app toast always
+      showToast(item.title, item.msg);
+      log(`ALARM FIRED: ${item.label}`, 'log-fire');
+
+      // OS notification
+      try {
+        const n = new Notification(item.title, {
+          body: item.msg,
+          icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%230a0a0f"/><text y=".9em" font-size="80">⚡</text></svg>',
+          badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23ff003c"/><text y=".9em" font-size="80">!</text></svg>',
+          vibrate: [200, 100, 200, 100, 400],
+          requireInteraction: true,
+          tag: 'levelup-alarm-' + item.time,
+        });
+        n.onclick = () => { window.focus(); n.close(); };
+      } catch(e) {
+        log('Notification display error: ' + e.message, 'log-fire');
+      }
+    }
+
+    function scheduleAlarms() {
+      // Clear existing
+      scheduledTimeouts.forEach(clearTimeout);
+      scheduledTimeouts = [];
+
+      let scheduled = 0;
+      SCHEDULE.forEach(item => {
+        const ms = msUntil(item.time);
+        if (ms > 0 && ms < 24 * 60 * 60 * 1000) {
+          const tid = setTimeout(() => fireNotification(item), ms);
+          scheduledTimeouts.push(tid);
+          scheduled++;
+          const mins = Math.round(ms / 60000);
+          log(`Scheduled: ${item.label} in ${mins} min`);
+        }
+      });
+
+      log(`${scheduled} alarms armed for today.`, 'log-fire');
+
+      if (scheduled === 0) {
+        setStatus("All tasks done for today. Sleep. Reset tomorrow.", 'active');
+        log('All today\'s alarms already passed. See you tomorrow.', 'log-fire');
+      }
+    }
+
+    function sendTestNotification() {
+      if (!notificationsEnabled) {
+        alert('Activate notifications first!');
+        return;
+      }
+      const testItems = [
+        { title: "⚡ TEST ALARM", msg: "If you can read this, the system is armed. You have no more excuses. GO WORK.", label: "TEST" },
+      ];
+      fireNotification(testItems[0]);
+      log('Test notification fired.', 'log-fire');
+    }
+
+    // ═══════════════════════════════════════════════
+    // LIVE CLOCK + TASK RENDERING
+    // ═══════════════════════════════════════════════
+    function getCurrentTask() {
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+
+      let currentIdx = -1;
+      for (let i = 0; i < SCHEDULE.length; i++) {
+        const [h, m] = SCHEDULE[i].time.split(':').map(Number);
+        const taskMins = h * 60 + m;
+        if (nowMins >= taskMins) currentIdx = i;
+        else break;
+      }
+      return currentIdx;
+    }
+
+    function getNextTask() {
+      const now = new Date();
+      const nowMins = now.getHours() * 60 + now.getMinutes();
+      for (let i = 0; i < SCHEDULE.length; i++) {
+        const [h, m] = SCHEDULE[i].time.split(':').map(Number);
+        if (h * 60 + m > nowMins) return { task: SCHEDULE[i], idx: i };
+      }
+      return null;
+    }
+
+    function renderTasks() {
+      const list = document.getElementById('task-list');
+      const currentIdx = getCurrentTask();
+      const next = getNextTask();
+
+      let html = '';
+      SCHEDULE.forEach((item, i) => {
+        let cls = 'upcoming';
+        let badge = '';
+        if (i < currentIdx) cls = 'done';
+        else if (i === currentIdx) { cls = 'current'; badge = '<span class="current-badge">NOW</span>'; }
+
+        const [h, m] = item.time.split(':').map(Number);
+        const t12 = formatTime12(h, m);
+
+        html += `<div class="task-item ${cls}">
+          <span class="task-emoji">${item.emoji}</span>
+          <div style="flex:1">
+            <div class="task-time">${t12}</div>
+            <div class="task-label">${item.label}</div>
+          </div>
+          ${badge}
+        </div>`;
+      });
+
+      list.innerHTML = html;
+
+      // Progress
+      const done = Math.max(0, currentIdx);
+      const pct = Math.round((done / SCHEDULE.length) * 100);
+      document.getElementById('progress-fill').style.width = pct + '%';
+      document.getElementById('progress-pct').textContent = pct + '%';
+
+      // Next task
+      if (next) {
+        document.getElementById('next-task-name').textContent = next.task.label;
+        const [h, m] = next.task.time.split(':').map(Number);
+        document.getElementById('next-task-time').textContent = formatTime12(h, m);
+      } else {
+        document.getElementById('next-task-name').textContent = 'All done';
+        document.getElementById('next-task-time').textContent = '—';
+      }
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2,'0');
+      const m = String(now.getMinutes()).padStart(2,'0');
+      const s = String(now.getSeconds()).padStart(2,'0');
+      document.getElementById('live-clock').textContent = `${h}:${m}:${s}`;
+
+      const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+      const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+      document.getElementById('live-date').textContent =
+        `${days[now.getDay()]} — ${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()}`;
+    }
+
+    // ═══════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════
+    function init() {
+      updateClock();
+      renderTasks();
+
+      setInterval(() => {
+        updateClock();
+        renderTasks();
+      }, 1000);
+
+      // Check permission state
+      if ('Notification' in window) {
+        if (Notification.permission === 'granted') {
+          notificationsEnabled = true;
+          document.getElementById('enable-btn').textContent = '✅ NOTIFICATIONS ACTIVE';
+          document.getElementById('enable-btn').disabled = true;
+          setStatus('ARMED. Re-scheduling alarms...', 'active');
+          scheduleAlarms();
+        } else if (Notification.permission === 'denied') {
+          setStatus('Notifications blocked. Check browser settings.', 'warn');
+          log('Notifications BLOCKED. Enable in site settings.', 'log-fire');
+        } else {
+          setStatus('Tap ACTIVATE to enable notifications.', '');
+          log('Waiting for activation...');
+        }
+      } else {
+        setStatus('Notifications not supported here.', 'warn');
+        log('ERROR: Notification API missing. Use Chrome or Safari 16.4+', 'log-fire');
+      }
+
+      // Register service worker for PWA
+      if ('serviceWorker' in navigator) {
+        // Inline service worker
+        const swCode = `
+          self.addEventListener('install', () => self.skipWaiting());
+          self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
+          self.addEventListener('notificationclick', function(e) {
+            e.notification.close();
+            e.waitUntil(clients.openWindow('/'));
+          });
+        `;
+        const blob = new Blob([swCode], { type: 'application/javascript' });
+        const swUrl = URL.createObjectURL(blob);
+        navigator.serviceWorker.register(swUrl, { scope: '/' })
+          .then(() => log('Service worker registered.'))
+          .catch(e => log('SW error: ' + e.message, 'log-fire'));
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+
+  <!-- PWA Manifest (inline) -->
+  <script>
+    const manifest = {
+      name: "LEVEL UP — Alarm System",
+      short_name: "LEVEL UP",
+      description: "2-Month Level Up Alarm System",
+      start_url: "./",
+      display: "standalone",
+      background_color: "#0a0a0f",
+      theme_color: "#0a0a0f",
+      icons: [
+        {
+          src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%230a0a0f'/><text y='160' font-size='160'>⚡</text></svg>",
+          sizes: "192x192",
+          type: "image/svg+xml"
+        }
+      ]
+    };
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = url;
+    document.head.appendChild(link);
+  </script>
+</body>
+</html>
