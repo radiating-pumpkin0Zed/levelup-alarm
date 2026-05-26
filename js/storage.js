@@ -6,12 +6,16 @@ const SK = 'lu_v3';
 export function load() {
   try {
     const r = localStorage.getItem(SK);
-    if (r) return JSON.parse(r);
+    if (r) {
+      const d = JSON.parse(r);
+      if (d.settings?.apiKey) delete d.settings.apiKey;
+      return d;
+    }
   } catch (e) {}
   return {
     days:     {},
     stats:    { streak:0, bestStreak:0, totalXP:0, lastDate:null },
-    settings: { sound:false, alarms:true, penalty:true, bg:'anime', apiKey:'' },
+    settings: { sound:false, alarms:true, penalty:true, bg:'anime' },
   };
 }
 
@@ -26,18 +30,25 @@ export function todayKey() {
 
 export function initDay(d, k) {
   if (!d.days[k]) {
-    d.days[k] = { tasks:{}, funActs:{}, moods:{} };
+    d.days[k] = { tasks:{}, funActs:{}, moods:{}, xpAwards:{}, rewards:{} };
     SCHED.forEach(t => { d.days[k].tasks[t.id] = 'pending'; });
   }
   // Migrate v2: tasks at root of day object
   if (!d.days[k].tasks) {
     const tasks = {};
     SCHED.forEach(t => { tasks[t.id] = d.days[k][t.id] || 'pending'; });
-    d.days[k] = { tasks, funActs: d.days[k].funActs||{}, moods:{} };
+    d.days[k] = { tasks, funActs: d.days[k].funActs||{}, moods:{}, xpAwards:{}, rewards:{} };
   }
-  if (!d.days[k].funActs) d.days[k].funActs = {};
-  if (!d.days[k].moods)   d.days[k].moods   = {};
+  if (!d.days[k].funActs)  d.days[k].funActs  = {};
+  if (!d.days[k].moods)    d.days[k].moods    = {};
+  if (!d.days[k].xpAwards) d.days[k].xpAwards = {};
+  if (!d.days[k].rewards)  d.days[k].rewards  = {};
   return d.days[k];
+}
+
+export function parseDayKey(k) {
+  const [y, m, d] = k.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 // ── Pattern analysis helper ──────────────────────────
@@ -65,7 +76,7 @@ export function analyzePatterns(data) {
   const dowStats = Array(7).fill(null).map(() => ({ total:0, completed:0 }));
 
   histDays.forEach(([dateKey, dayData]) => {
-    const dow = new Date(dateKey).getDay();
+    const dow = parseDayKey(dateKey).getDay();
     const tasks  = dayData.tasks  || dayData;
     const moods  = dayData.moods  || {};
 

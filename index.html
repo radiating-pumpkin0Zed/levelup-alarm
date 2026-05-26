@@ -236,14 +236,6 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .toggle::after{content:"";position:absolute;top:3px;left:3px;width:16px;height:16px;background:var(--muted2);transition:all .2s}
 .toggle.on{background:rgba(0,255,136,.2)}.toggle.on::after{transform:translateX(18px);background:var(--g)}
 
-/* API key row */
-.api-row{margin-top:12px;display:flex;flex-direction:column;gap:6px}
-.api-row label{font-size:10px;color:var(--muted2);letter-spacing:.1em;line-height:1.6}
-.api-input{width:100%;padding:10px;background:rgba(0,0,0,.5);border:1px solid var(--border2);color:var(--text);font-family:var(--fm);font-size:12px;letter-spacing:.08em}
-.api-input:focus{outline:none;border-color:var(--c)}
-.api-save-btn{padding:10px;background:transparent;border:1px solid var(--c);color:var(--c);font-family:var(--fu);font-size:11px;letter-spacing:.15em;cursor:pointer;transition:all .2s}
-.api-save-btn:hover{background:var(--c);color:#000}
-
 /* Debrief panel (slides from LEFT) */
 #debrief-panel{left:0;right:auto;border-left:none;border-right:2px solid var(--border2);transform:translateX(-100%)}
 #debrief-panel.open{transform:translateX(0)}
@@ -254,10 +246,10 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .debrief-submit:not(:disabled):hover{background:var(--r);color:#000}
 .debrief-submit:disabled{opacity:.5;cursor:wait}
 #debrief-output{display:none;margin-top:12px;padding:14px;background:rgba(0,0,0,.6);border:1px solid var(--border2);border-left:3px solid var(--y);font-size:12px;line-height:1.8;color:var(--text)}
+.debrief-response{white-space:pre-line}
 .debrief-error{color:var(--fail)}
 .debrief-loading{color:var(--c);font-family:var(--fu);font-size:11px;letter-spacing:.15em}
 .blink-cursor{animation:blk 1s step-end infinite}
-#debrief-key-section{display:none;margin-top:10px;padding:10px;background:rgba(255,170,0,.08);border:1px solid rgba(255,170,0,.3);font-size:11px;color:var(--y);line-height:1.8}
 .debrief-stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
 .debrief-stat{background:rgba(0,0,0,.5);border:1px solid var(--border);padding:10px 6px;text-align:center}
 .debrief-stat .dn{font-family:var(--fu);font-size:22px;font-weight:900;line-height:1}
@@ -397,12 +389,6 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
   <div class="toggle-row">Alarm Notifications<button class="toggle on" id="tog-notif" onclick="togNotif()"></button></div>
   <div class="toggle-row">Penalty Alerts<button class="toggle on" id="tog-penalty" onclick="togPenalty()"></button></div>
   <div class="toggle-row">Sound Effects<button class="toggle" id="tog-sound" onclick="toggleSound()"></button></div>
-  <div class="panel-sec">AI DEBRIEF — API KEY</div>
-  <div class="api-row">
-    <label>ANTHROPIC API KEY (stored locally only — never shared)</label>
-    <input class="api-input" id="api-key-input" type="password" placeholder="sk-ant-..."/>
-    <button class="api-save-btn" onclick="saveApiKey()">[ SAVE KEY ]</button>
-  </div>
   <div class="panel-sec">DANGER ZONE</div>
   <button class="sbtn" style="width:100%;margin:0" onclick="resetAll()">[ RESET ALL DATA ]</button>
 </div>
@@ -412,7 +398,7 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 <div class="panel" id="debrief-panel" onclick="event.stopPropagation()">
   <button class="panel-close" onclick="closeDebrief()">✕</button>
   <div class="panel-title">DEBRIEF</div>
-  <div class="panel-sub">AI DAILY ANALYSIS // BRUTAL EDITION</div>
+  <div class="panel-sub">LOCAL DAILY ANALYSIS // NO API KEY</div>
   <div class="panel-sec">TODAY'S STATS</div>
   <div class="debrief-stats-row">
     <div class="debrief-stat ddc"><div class="dn" id="db-done">0</div><div class="dl">✓ DONE</div></div>
@@ -420,13 +406,12 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
     <div class="debrief-stat dpc"><div class="dn" id="db-pend">0</div><div class="dl">○ LEFT</div></div>
   </div>
   <div class="panel-sec">WHAT DID YOU ACTUALLY DO TODAY?</div>
-  <textarea class="debrief-textarea" id="debrief-input" placeholder="Be honest. What did you get done? What did you skip? What got in the way? Claude will see your task stats above automatically."></textarea>
-  <button class="debrief-submit" id="debrief-submit" onclick="submitDebrief()">GET ROASTED ⚡</button>
-  <div id="debrief-key-section">⚠ API key not set. Go to ⚙️ Settings → AI Debrief to add your Anthropic key.</div>
+  <textarea class="debrief-textarea" id="debrief-input" placeholder="Be honest. What did you get done? What did you skip? What got in the way? Your task stats above are included automatically."></textarea>
+  <button class="debrief-submit" id="debrief-submit" onclick="submitDebrief()">GENERATE DEBRIEF</button>
   <div id="debrief-output"></div>
   <div style="margin-top:16px;font-size:10px;color:var(--muted2);line-height:1.8">
-    +35 XP for completing a debrief.<br/>
-    Get your free API key at <span style="color:var(--c)">console.anthropic.com</span>
+    +35 XP once per day for completing a debrief.<br/>
+    Runs locally in your browser. No API key, no paid calls.
   </div>
 </div>
 

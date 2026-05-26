@@ -26,7 +26,13 @@ export function addLog(msg, cls = '') {
   const n  = new Date();
   const ts = `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}`;
   const d  = document.createElement('div');
-  d.innerHTML = `<span class="lt">[${ts}]</span> <span class="${cls}">${msg}</span>`;
+  const time = document.createElement('span');
+  time.className = 'lt';
+  time.textContent = `[${ts}]`;
+  const body = document.createElement('span');
+  body.className = cls;
+  body.textContent = ` ${msg}`;
+  d.append(time, body);
   a.insertBefore(d, a.firstChild);
   if (a.children.length > 50) a.removeChild(a.lastChild);
 }
@@ -35,11 +41,6 @@ export function addLog(msg, cls = '') {
 export function openPanel() {
   document.getElementById('panel-overlay').classList.add('open');
   document.getElementById('panel').classList.add('open');
-  // Populate API key field
-  const d = load();
-  const key = d.settings?.apiKey || '';
-  const el = document.getElementById('api-key-input');
-  if (el) el.value = key ? '••••••••••••••••' : '';
 }
 export function closePanel() {
   document.getElementById('panel-overlay').classList.remove('open');
@@ -77,15 +78,4 @@ export function togPenalty() {
   state.penaltyOn = !state.penaltyOn;
   const d = load(); d.settings = d.settings || {}; d.settings.penalty = state.penaltyOn; save(d);
   document.getElementById('tog-penalty').className = 'toggle' + (state.penaltyOn ? ' on' : '');
-}
-
-// ── API key save ───────────────────────────────────────
-export function saveApiKey() {
-  const el  = document.getElementById('api-key-input');
-  const key = el.value.trim();
-  if (!key || key.startsWith('•')) return;
-  const d = load(); d.settings = d.settings || {}; d.settings.apiKey = key; save(d);
-  el.value = '••••••••••••••••';
-  toast('API KEY SAVED', 'Claude AI debrief is ready. Go get roasted.', true);
-  addLog('API key saved.', 'lg');
 }

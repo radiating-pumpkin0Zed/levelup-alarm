@@ -5,7 +5,7 @@ import { load, save, todayKey, initDay }    from './storage.js';
 import { acquireWakeLock, toggleWakeLock, toggleSound } from './audio.js';
 import { toast, addLog, setSt, openPanel, closePanel,
          openDebrief as _openDebrief, closeDebrief,
-         setBg, togNotif, togPenalty, saveApiKey } from './ui.js';
+         setBg, togNotif, togPenalty } from './ui.js';
 import { renderAll, renderInsights, updClock,
          flashT, xpFloat, getLvl, getLvlInfo, msUntil } from './render.js';
 import { reqPerm, fireN, schedAll, checkMissedAlarms, startPeriodicCheck } from './notifications.js';
@@ -33,7 +33,6 @@ window.submitDebrief  = submitDebrief;
 window.setBg          = setBg;
 window.togNotif       = togNotif;
 window.togPenalty     = togPenalty;
-window.saveApiKey     = saveApiKey;
 window.toggleSound    = toggleSound;
 window.toggleWakeLock = toggleWakeLock;
 window.testN          = testN;
@@ -54,9 +53,11 @@ function markDone(id) {
   const pXP     = state.data.stats.totalXP || 0;
   const pLvl    = getLvl(pXP);
   state.data.stats.totalXP = pXP + xpGain;
+  dy.xpAwards[id] = xpGain;
 
-  if (SCHED.every(t=>dy.tasks[t.id]==='complete')) {
+  if (SCHED.every(t=>dy.tasks[t.id]==='complete') && !dy.rewards.allComplete) {
     state.data.stats.totalXP += 300;
+    dy.rewards.allComplete = true;
     updStreak();
     fireN('🏆 ALL TASKS COMPLETE!','Every task done. +300 bonus XP. Streak extended!','complete');
     addLog('ALL DONE! +300 BONUS XP','lg');
@@ -75,9 +76,16 @@ function markUndo(id) {
   if (dy.tasks[id] !== 'complete') return;
   const task = SCHED.find(t=>t.id===id); if (!task) return;
   dy.tasks[id] = 'pending';
-  state.data.stats.totalXP = Math.max(0,(state.data.stats.totalXP||0)-task.xp);
+  const xpLoss = dy.xpAwards?.[id] ?? task.xp;
+  if (dy.xpAwards) delete dy.xpAwards[id];
+  state.data.stats.totalXP = Math.max(0,(state.data.stats.totalXP||0)-xpLoss);
+  if (dy.rewards?.allComplete) {
+    dy.rewards.allComplete = false;
+    state.data.stats.totalXP = Math.max(0, (state.data.stats.totalXP||0) - 300);
+    addLog('ALL DONE bonus removed until the day is complete again.','ly');
+  }
   save(state.data); renderAll();
-  addLog(`UNDONE: ${task.label} (−${task.xp} XP)`,'ly');
+  addLog(`UNDONE: ${task.label} (−${xpLoss} XP)`,'ly');
 }
 
 // ── Mood tracking ──────────────────────────────────────
@@ -197,11 +205,13 @@ document.addEventListener('visibilitychange', async()=>{
   if(cfg.sound)          { state.soundOn=true; document.getElementById('sound-btn').textContent='🔊'; document.getElementById('tog-sound').className='toggle on'; }
   if(cfg.alarms===false) { state.alarmOn=false; document.getElementById('tog-notif').className='toggle'; }
   if(cfg.penalty===false){ state.penaltyOn=false; document.getElementById('tog-penalty').className='toggle'; }
-  if(cfg.apiKey)         document.getElementById('api-key-input').placeholder='••• key saved •••';
-
   // Daily quote
   const q=QUOTES[new Date().getDate()%QUOTES.length];
-  document.getElementById('quote-box').innerHTML=`"${q[0]}"<span>${q[1]}</span>`;
+  const quoteBox = document.getElementById('quote-box');
+  quoteBox.textContent = `"${q[0]}"`;
+  const quoteSrc = document.createElement('span');
+  quoteSrc.textContent = q[1];
+  quoteBox.appendChild(quoteSrc);
 
   updClock(); renderAll();
   setInterval(updClock, 1000);

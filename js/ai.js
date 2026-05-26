@@ -1,128 +1,108 @@
-// ── AI Daily Debrief (Claude API) ──
-import { state }            from './state.js';
-import { SCHED }            from './data.js';
+// ── Local Daily Debrief ──
+import { state }               from './state.js';
+import { SCHED, FUN_ACTS }     from './data.js';
 import { load, save, initDay } from './storage.js';
-import { toast, addLog, openDebrief, closeDebrief } from './ui.js';
+import { toast, addLog }       from './ui.js';
 import { renderAll, xpFloat, getLvl } from './render.js';
 
-const SYSTEM_PROMPT = `You are a brutally honest, darkly sarcastic productivity coach reviewing a CS student's daily progress.
+function buildDebrief(userText, completedTasks, failedTasks, totalTasks, funActs) {
+  const pct = Math.round(completedTasks.length / totalTasks * 100);
+  const missedCore = failedTasks.filter(t => t.xp >= 40);
+  const bestTask = completedTasks.slice().sort((a, b) => b.xp - a.xp)[0];
+  const badActs = funActs.filter(f => f.xp < 0);
+  const goodActs = funActs.filter(f => f.xp > 0);
 
-The student is on a 2-month self-improvement plan: web development, DSA/LeetCode, typing practice, creative skills (pixel art/editing), and project building.
+  let opener;
+  if (pct >= 85) {
+    opener = `Solid clear today: ${completedTasks.length}/${totalTasks} tasks done (${pct}%). That is actual progress, not productivity cosplay.`;
+  } else if (pct >= 55) {
+    opener = `Mixed run: ${completedTasks.length}/${totalTasks} tasks done (${pct}%). You did enough to stay in the game, but the boss fight is still standing there.`;
+  } else {
+    opener = `Rough day: ${completedTasks.length}/${totalTasks} tasks done (${pct}%). The schedule did not lose. You dropped inputs. Annoying, fixable, very human.`;
+  }
 
-Your job:
-- Be sarcastic, blunt, and call out failures by name — but humorously, not cruelly
-- Use gaming or anime references since that's their vibe (feel free to mention grinding, side quests, boss fights, etc.)
-- Call out the gap between their goals and actual output if it exists
-- If they did well, give genuine (but still sarcastic) praise
-- End with ONE specific, actionable thing they should do differently tomorrow
-- Keep it under 180 words
-- Write in flowing paragraphs, no bullet points
-- Tone: like a tough older mentor who genuinely wants them to win but has zero tolerance for excuses
+  const win = bestTask
+    ? `Best move was finishing "${bestTask.label}" for ${bestTask.xp} XP. Keep protecting that kind of work tomorrow.`
+    : `No completed main task means tomorrow needs one tiny guaranteed win before anything fancy.`;
 
-Do NOT be generic. Use the specific tasks and numbers they provide.`;
+  const failure = missedCore.length
+    ? `The real leak was ${missedCore.map(t => `"${t.label}"`).join(', ')}. Those are high-value blocks, so missing them hurts more than skipping a tiny break task.`
+    : failedTasks.length
+      ? `The misses were smaller, but they still count. Little leaks become the whole flood if you keep blessing them.`
+      : `No failed tasks logged. Beautiful. Suspiciously civilized.`;
 
-function buildPrompt(userText, completedTasks, failedTasks, totalTasks, funActs) {
-  const completedNames = completedTasks.map(t => t.label).join(', ') || 'nothing';
-  const failedNames    = failedTasks.map(t => t.label).join(', ')    || 'none';
-  const funTxt         = funActs.length > 0
-    ? `\nSide quests logged: ${funActs.map(f => `${f.label} (×${f.count})`).join(', ')}.`
-    : '';
+  const sideQuest = badActs.length
+    ? `Side quest warning: ${badActs.map(f => `${f.label} x${f.count}`).join(', ')}. Fun is fine; autopilot tax is not.`
+    : goodActs.length
+      ? `Side quests were sane: ${goodActs.map(f => `${f.label} x${f.count}`).join(', ')}. Recovery that does not hijack the day is a win.`
+      : `No side quests logged, so either you were focused or the tracking button was simply invisible to your soul.`;
 
-  return `Completed ${completedTasks.length}/${totalTasks} tasks today (${Math.round(completedTasks.length/totalTasks*100)}%).
-Completed: ${completedNames}.
-Failed: ${failedNames}.${funTxt}
+  const note = userText.length > 220 ? userText.slice(0, 220).trim() + '...' : userText;
+  const action = missedCore[0]
+    ? `Tomorrow: start "${missedCore[0].label}" with a 10-minute minimum timer. Once it starts, momentum can do its little magic trick.`
+    : failedTasks[0]
+      ? `Tomorrow: pre-decide the first 10 minutes of "${failedTasks[0].label}" so there is no negotiation at alarm time.`
+      : `Tomorrow: repeat the same structure, but pick one task to make cleaner, earlier, or less dramatic.`;
 
-What they say they did today:
-"${userText}"
-
-Now give them the honest debrief.`;
+  return `${opener}\n\n${win} ${failure}\n\n${sideQuest}\n\nYour note: "${note}"\n\n${action}`;
 }
 
 export async function submitDebrief() {
   const userText = document.getElementById('debrief-input').value.trim();
-  if (!userText) { toast('EMPTY', 'Write something. Anything. What did you actually do?', false); return; }
-
-  const d    = load();
-  const key  = d.settings?.apiKey || '';
-  if (!key) {
-    document.getElementById('debrief-key-section').style.display = 'block';
-    toast('API KEY NEEDED', 'Enter your Anthropic API key in the field below.', false, true);
+  if (!userText) {
+    toast('EMPTY', 'Write something. Anything. What did you actually do?', false);
     return;
   }
 
-  const dy            = initDay(d, state.todayStr);
-  const completedTasks= SCHED.filter(t => dy.tasks[t.id]==='complete');
-  const failedTasks   = SCHED.filter(t => dy.tasks[t.id]==='failed');
-  const funActs       = Object.entries(dy.funActs || {})
-    .map(([id, count]) => ({ id, count, label: _getFunLabel(id) }))
+  const d  = load();
+  const dy = initDay(d, state.todayStr);
+  const completedTasks = SCHED.filter(t => dy.tasks[t.id] === 'complete');
+  const failedTasks    = SCHED.filter(t => dy.tasks[t.id] === 'failed');
+  const funActs        = Object.entries(dy.funActs || {})
+    .map(([id, count]) => ({ ..._getFunAct(id), count }))
     .filter(f => f.count > 0);
 
-  const prompt = buildPrompt(userText, completedTasks, failedTasks, SCHED.length, funActs);
-
-  // UI: loading state
   const btn = document.getElementById('debrief-submit');
   const out = document.getElementById('debrief-output');
   btn.disabled = true;
-  btn.textContent = 'CONSULTING AI...';
-  out.innerHTML = '<div class="debrief-loading">Analyzing your mediocrity...<span class="blink-cursor">█</span></div>';
+  btn.textContent = 'ANALYZING...';
   out.style.display = 'block';
+  out.replaceChildren(_el('div', 'debrief-loading', 'Analyzing the evidence...'));
 
-  try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 400,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+  await new Promise(resolve => setTimeout(resolve, 250));
 
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error?.message || `HTTP ${res.status}`);
-    }
+  const text = buildDebrief(userText, completedTasks, failedTasks, SCHED.length, funActs);
+  out.replaceChildren(_el('div', 'debrief-response', text));
 
-    const data2 = await res.json();
-    const text  = data2.content?.[0]?.text || 'No response.';
-
-    out.innerHTML = `<div class="debrief-response">${text.replace(/\n/g,'<br/>')}</div>`;
-
-    // Award XP for doing the debrief
+  if (!dy.rewards.debrief) {
     const pXP  = d.stats.totalXP || 0;
     const pLvl = getLvl(pXP);
     d.stats.totalXP = pXP + 35;
+    dy.rewards.debrief = true;
     save(d); state.data = d;
     renderAll();
     xpFloat(35, document.getElementById('debrief-panel'));
-    const nLvl = getLvl(d.stats.totalXP);
     addLog('Daily debrief complete. +35 XP', 'lg');
+    const nLvl = getLvl(d.stats.totalXP);
     if (nLvl > pLvl) {
       const { lvlUp } = await import('./app.js');
       lvlUp(nLvl);
     }
-
-  } catch (e) {
-    out.innerHTML = `<div class="debrief-error">ERROR: ${e.message}<br/>Check your API key in settings.</div>`;
-    addLog('Debrief API error: ' + e.message, 'lf');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'GET ROASTED ⚡';
+  } else {
+    addLog('Daily debrief refreshed. XP already awarded today.', 'ly');
   }
+
+  btn.disabled = false;
+  btn.textContent = 'GENERATE DEBRIEF';
 }
 
-function _getFunLabel(id) {
-  const acts = [
-    {id:'anime',label:'Anime'},{id:'gaming',label:'Gaming'},{id:'walk',label:'Walk'},
-    {id:'cook',label:'Cooking'},{id:'friends',label:'Friends'},{id:'read',label:'Reading'},
-    {id:'movie',label:'Movie'},{id:'nap',label:'Nap'},{id:'music',label:'Music'},
-    {id:'doomscroll',label:'Doomscroll'},{id:'junk',label:'Junk Food'},{id:'latebedtime',label:'Late Night'},
-  ];
-  return acts.find(a => a.id===id)?.label || id;
+function _getFunAct(id) {
+  return FUN_ACTS.find(a => a.id === id) || { id, label: id, xp: 0 };
+}
+
+function _el(tag, cls, text) {
+  const el = document.createElement(tag);
+  el.className = cls;
+  el.textContent = text;
+  return el;
 }
