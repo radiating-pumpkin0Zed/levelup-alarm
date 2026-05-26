@@ -7,7 +7,7 @@ import { toast, addLog, setSt, openPanel, closePanel,
          openDebrief as _openDebrief, closeDebrief,
          setBg, togNotif, togPenalty } from './ui.js';
 import { renderAll, renderInsights, updClock,
-         flashT, xpFloat, getLvl, getLvlInfo, msUntil } from './render.js';
+         flashT, xpFloat, getLvl, getLvlInfo, msUntil, getWeeklyBossStatus } from './render.js';
 import { reqPerm, fireN, schedAll, checkMissedAlarms, startPeriodicCheck } from './notifications.js';
 import { submitDebrief } from './ai.js';
 
@@ -39,6 +39,8 @@ window.testN          = testN;
 window.resetDay       = resetDay;
 window.resetAll       = resetAll;
 window.closeLvl       = closeLvl;
+window.logDsaProblems = logDsaProblems;
+window.claimBossReward= claimBossReward;
 
 // ── Task completion ────────────────────────────────────
 function markDone(id) {
@@ -78,6 +80,7 @@ function markUndo(id) {
   dy.tasks[id] = 'pending';
   const xpLoss = dy.xpAwards?.[id] ?? task.xp;
   if (dy.xpAwards) delete dy.xpAwards[id];
+  dy.undoCount = (dy.undoCount || 0) + 1;
   state.data.stats.totalXP = Math.max(0,(state.data.stats.totalXP||0)-xpLoss);
   if (dy.rewards?.allComplete) {
     dy.rewards.allComplete = false;
@@ -118,6 +121,41 @@ function logFunAct(id) {
     : `${act.emoji} ${act.xp} XP. ${act.label} is a trap and you know it.`;
   addLog(msg, act.xp>0?'ly':'lf');
   toast(act.xp>0?`SIDE QUEST: ${act.emoji}`:`BAD HABIT: ${act.emoji}`, msg, act.xp>0, act.xp<0);
+  const nLvl = getLvl(state.data.stats.totalXP);
+  if (nLvl > pLvl) lvlUp(nLvl);
+}
+
+// ── DSA problem counter ─────────────────────────────────────────
+function logDsaProblems(count) {
+  const n = Number(count) || 0;
+  if (n <= 0) return;
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  dy.dsaProblems = (dy.dsaProblems || 0) + n;
+  state.data.stats.dsaProblems = (state.data.stats.dsaProblems || 0) + n;
+  save(state.data); renderAll();
+  addLog(`DSA PROBLEMS: +${n} solved (${state.data.stats.dsaProblems} total)`,'lg');
+  toast('DSA LOGGED', `+${n} problem${n===1?'':'s'} logged. Badge progress updated.`, true);
+}
+
+// ── Weekly boss reward ──────────────────────────────────────────
+function claimBossReward() {
+  state.data = load();
+  initDay(state.data, state.todayStr);
+  const boss = getWeeklyBossStatus(state.data, state.todayStr);
+  if (!boss.complete || boss.claimed) {
+    toast('BOSS LOCKED', boss.claimed ? 'Reward already claimed this week.' : 'Finish the weekly challenge first.', false, true);
+    return;
+  }
+  const pXP = state.data.stats.totalXP || 0;
+  const pLvl = getLvl(pXP);
+  state.data.stats.totalXP = pXP + boss.reward;
+  state.data.bossRewards = state.data.bossRewards || {};
+  state.data.bossRewards[boss.weekKey] = { id:boss.id, reward:boss.reward, claimedAt:new Date().toISOString() };
+  save(state.data); renderAll();
+  xpFloat(boss.reward, document.getElementById('boss-fight'));
+  addLog(`BOSS CLEARED: ${boss.name} (+${boss.reward} XP)`,'lg');
+  toast('BOSS CLEARED', `${boss.name} defeated. +${boss.reward} XP.`, true);
   const nLvl = getLvl(state.data.stats.totalXP);
   if (nLvl > pLvl) lvlUp(nLvl);
 }

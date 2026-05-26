@@ -141,6 +141,7 @@ export function renderAll() {
 
   renderInsights();
   renderWeekChart();
+  renderGamification();
   renderStatsDashboard();
 }
 
@@ -413,6 +414,176 @@ function estimateDayXp(day) {
 
 function dateKey(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// ── Gamification: boss fights + achievements ───────────────────
+const BOSSES = [
+  {
+    id:'clean5', name:'NO-UNDO DUEL', reward:150,
+    desc:'Complete 5 tasks in one day this week without using undo.',
+    calc: days => {
+      const best = Math.max(0, ...days.map(([, day]) => day && day.undoCount === 0 ? completedCount(day) : 0));
+      return { current:best, target:5, label:`${best}/5 clean tasks` };
+    },
+  },
+  {
+    id:'project3', name:'PORTFOLIO BOSS', reward:175,
+    desc:'Complete Project Building 3 times this week.',
+    calc: days => {
+      const n = days.filter(([, day]) => taskDone(day, '1700')).length;
+      return { current:n, target:3, label:`${n}/3 project sessions` };
+    },
+  },
+  {
+    id:'dsa10', name:'ALGORITHM ARENA', reward:160,
+    desc:'Log 10 DSA problems solved this week.',
+    calc: days => {
+      const n = days.reduce((sum, [, day]) => sum + (day?.dsaProblems || 0), 0);
+      return { current:n, target:10, label:`${n}/10 problems` };
+    },
+  },
+  {
+    id:'debrief3', name:'REFLECTION RAID', reward:140,
+    desc:'Complete 3 daily debriefs this week.',
+    calc: days => {
+      const n = days.filter(([, day]) => day?.rewards?.debrief).length;
+      return { current:n, target:3, label:`${n}/3 debriefs` };
+    },
+  },
+  {
+    id:'fullDay', name:'PERFECT CLEAR', reward:220,
+    desc:'Complete every scheduled task on any one day this week.',
+    calc: days => {
+      const n = days.filter(([, day]) => isFullDay(day)).length;
+      return { current:n, target:1, label:n ? 'full clear achieved' : '0/1 full clears' };
+    },
+  },
+];
+
+const ACHIEVEMENTS = [
+  { id:'firstTask', ico:'⚡', name:'FIRST SPARK', desc:'Complete your first task.', check:s => s.completedTasks >= 1 },
+  { id:'firstFull', ico:'🏆', name:'FIRST FULL DAY', desc:'Complete every task once.', check:s => s.fullDays >= 1 },
+  { id:'streak3', ico:'🔥', name:'3-DAY STREAK', desc:'Hold the line for 3 days.', check:s => s.bestStreak >= 3 },
+  { id:'streak7', ico:'🌋', name:'WEEK STREAK', desc:'Reach a 7-day streak.', check:s => s.bestStreak >= 7 },
+  { id:'dsa100', ico:'🧠', name:'100 DSA PROBLEMS', desc:'Log 100 solved problems.', check:s => s.dsaProblems >= 100 },
+  { id:'project10', ico:'⚒️', name:'PROJECT BUILDER', desc:'Finish 10 project blocks.', check:s => s.projectSessions >= 10 },
+  { id:'cleanDay', ico:'🛡️', name:'CLEAN RUN', desc:'5 tasks in a day, zero undo.', check:s => s.cleanRuns >= 1 },
+  { id:'debrief7', ico:'📋', name:'HONEST MIRROR', desc:'Complete 7 debriefs.', check:s => s.debriefs >= 7 },
+  { id:'level5', ico:'⭐', name:'LEVEL 5', desc:'Reach CODER rank.', check:s => s.totalXP >= 2000 },
+  { id:'boss1', ico:'👑', name:'BOSS SLAYER', desc:'Claim a weekly boss reward.', check:s => s.bossClaims >= 1 },
+];
+
+export function renderGamification() {
+  const data = state.data || load();
+  const dsaEl = document.getElementById('dsa-total');
+  if (dsaEl) dsaEl.textContent = data.stats?.dsaProblems || 0;
+  renderBossFight(data);
+  renderAchievements(data);
+}
+
+export function getWeeklyBossStatus(data, todayStr = state.todayStr) {
+  const week = getWeekInfo(todayStr);
+  const boss = BOSSES[hashString(week.key) % BOSSES.length];
+  const days = week.keys.map(k => [k, data.days?.[k]]);
+  const progress = boss.calc(days, data);
+  const complete = progress.current >= progress.target;
+  const claimed = !!data.bossRewards?.[week.key];
+  return { ...boss, weekKey:week.key, label:week.label, progress, complete, claimed };
+}
+
+function renderBossFight(data) {
+  const el = document.getElementById('boss-fight');
+  if (!el) return;
+  const boss = getWeeklyBossStatus(data);
+  const pct = Math.min(100, Math.round(boss.progress.current / boss.progress.target * 100));
+  const btn = boss.claimed
+    ? '<button class="claim-btn" disabled>CLAIMED</button>'
+    : boss.complete
+      ? '<button class="claim-btn" onclick="claimBossReward()">CLAIM XP</button>'
+      : '<button class="claim-btn" disabled>LOCKED</button>';
+  el.innerHTML = `<div class="boss-card">
+    <div class="boss-top">
+      <div><div class="boss-name">${boss.name}</div><div class="boss-week">${boss.label}</div></div>
+      <div class="boss-reward">+${boss.reward} XP</div>
+    </div>
+    <div class="boss-desc">${boss.desc}</div>
+    <div class="boss-bar"><div class="boss-fill" style="width:${pct}%"></div></div>
+    <div class="boss-foot"><div class="boss-progress">${boss.progress.label}</div>${btn}</div>
+  </div>`;
+}
+
+function renderAchievements(data) {
+  const el = document.getElementById('achievements');
+  if (!el) return;
+  const summary = achievementSummary(data);
+  el.innerHTML = ACHIEVEMENTS.map(a => {
+    const unlocked = a.check(summary);
+    return `<div class="ach-card${unlocked?' unlocked':''}" title="${a.desc}">
+      <div class="ach-ico">${a.ico}</div>
+      <div class="ach-name">${a.name}</div>
+      <div class="ach-desc">${unlocked ? 'UNLOCKED' : a.desc}</div>
+    </div>`;
+  }).join('');
+}
+
+function achievementSummary(data) {
+  const days = Object.values(data.days || {});
+  const projectId = '1700';
+  let completedTasks = 0, fullDays = 0, projectSessions = 0, cleanRuns = 0, debriefs = 0;
+  days.forEach(day => {
+    const done = completedCount(day);
+    completedTasks += done;
+    if (done === SCHED.length) fullDays++;
+    if (taskDone(day, projectId)) projectSessions++;
+    if (done >= 5 && day.undoCount === 0) cleanRuns++;
+    if (day.rewards?.debrief) debriefs++;
+  });
+  return {
+    completedTasks,
+    fullDays,
+    projectSessions,
+    cleanRuns,
+    debriefs,
+    dsaProblems: data.stats?.dsaProblems || 0,
+    bestStreak: data.stats?.bestStreak || data.stats?.streak || 0,
+    totalXP: data.stats?.totalXP || 0,
+    bossClaims: Object.keys(data.bossRewards || {}).length,
+  };
+}
+
+function getWeekInfo(todayStr) {
+  const start = parseDayKey(todayStr || dateKey(new Date()));
+  const day = start.getDay();
+  start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+  const keys = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    keys.push(dateKey(d));
+  }
+  return { key:keys[0], keys, label:`WEEK OF ${keys[0]}` };
+}
+
+function hashString(s) {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function completedCount(day) {
+  if (!day) return 0;
+  const tasks = day.tasks || day;
+  return SCHED.filter(task => tasks[task.id] === 'complete').length;
+}
+
+function taskDone(day, id) {
+  if (!day) return false;
+  const tasks = day.tasks || day;
+  return tasks[id] === 'complete';
+}
+
+function isFullDay(day) {
+  return completedCount(day) === SCHED.length;
 }
 
 // ── Clock ───────────────────────────────────────────────────────

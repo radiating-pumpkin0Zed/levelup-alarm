@@ -9,14 +9,16 @@ export function load() {
     if (r) {
       const d = JSON.parse(r);
       if (d.settings?.apiKey) delete d.settings.apiKey;
-      return d;
+      return normalizeData(d);
     }
   } catch (e) {}
-  return {
+  return normalizeData({
     days:     {},
-    stats:    { streak:0, bestStreak:0, totalXP:0, lastDate:null },
+    stats:    { streak:0, bestStreak:0, totalXP:0, lastDate:null, dsaProblems:0 },
     settings: { sound:false, alarms:true, penalty:true, bg:'anime' },
-  };
+    bossRewards: {},
+    dailyMissionRewards: {},
+  });
 }
 
 export function save(d) {
@@ -30,20 +32,42 @@ export function todayKey() {
 
 export function initDay(d, k) {
   if (!d.days[k]) {
-    d.days[k] = { tasks:{}, funActs:{}, moods:{}, xpAwards:{}, rewards:{} };
+    d.days[k] = { tasks:{}, funActs:{}, moods:{}, xpAwards:{}, completedAt:{}, rewards:{}, undoCount:0, dsaProblems:0 };
     SCHED.forEach(t => { d.days[k].tasks[t.id] = 'pending'; });
   }
   // Migrate v2: tasks at root of day object
   if (!d.days[k].tasks) {
     const tasks = {};
     SCHED.forEach(t => { tasks[t.id] = d.days[k][t.id] || 'pending'; });
-    d.days[k] = { tasks, funActs: d.days[k].funActs||{}, moods:{}, xpAwards:{}, rewards:{} };
+    d.days[k] = { tasks, funActs: d.days[k].funActs||{}, moods:{}, xpAwards:{}, completedAt:{}, rewards:{}, undoCount:0, dsaProblems:0 };
   }
   if (!d.days[k].funActs)  d.days[k].funActs  = {};
   if (!d.days[k].moods)    d.days[k].moods    = {};
   if (!d.days[k].xpAwards) d.days[k].xpAwards = {};
+  if (!d.days[k].completedAt) d.days[k].completedAt = {};
   if (!d.days[k].rewards)  d.days[k].rewards  = {};
+  if (!Number.isFinite(d.days[k].undoCount)) d.days[k].undoCount = 0;
+  if (!Number.isFinite(d.days[k].dsaProblems)) d.days[k].dsaProblems = 0;
   return d.days[k];
+}
+
+function normalizeData(d) {
+  d.days = d.days || {};
+  d.stats = d.stats || {};
+  d.settings = d.settings || {};
+  d.bossRewards = d.bossRewards || {};
+  d.dailyMissionRewards = d.dailyMissionRewards || {};
+  d.stats.streak = d.stats.streak || 0;
+  d.stats.bestStreak = d.stats.bestStreak || 0;
+  d.stats.totalXP = d.stats.totalXP || 0;
+  d.stats.lastDate = d.stats.lastDate || null;
+  d.stats.dsaProblems = d.stats.dsaProblems || 0;
+  d.settings.sound = !!d.settings.sound;
+  if (d.settings.alarms !== false) d.settings.alarms = true;
+  if (d.settings.penalty !== false) d.settings.penalty = true;
+  d.settings.bg = d.settings.bg || 'anime';
+  Object.keys(d.days).forEach(k => initDay(d, k));
+  return d;
 }
 
 export function parseDayKey(k) {

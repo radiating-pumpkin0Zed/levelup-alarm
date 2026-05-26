@@ -207,6 +207,31 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .xp-empty{padding:16px;text-align:center;font-size:11px;color:var(--muted2);border:1px dashed var(--border);line-height:1.8}
 @media (min-width:720px){.stats-grid{grid-template-columns:repeat(4,1fr)}.heatmap{grid-template-columns:repeat(21,1fr)}}
 
+/* GAMIFICATION */
+.boss-card{background:linear-gradient(135deg,rgba(255,0,64,.13),rgba(0,255,204,.06)),var(--card);border:1px solid rgba(255,0,64,.45);border-left:3px solid var(--r);padding:12px 14px;backdrop-filter:blur(8px)}
+.boss-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.boss-name{font-family:var(--fu);font-size:13px;font-weight:900;color:var(--r);letter-spacing:.08em;text-shadow:var(--gR)}
+.boss-week{font-family:var(--fu);font-size:8px;color:var(--muted2);letter-spacing:.14em;margin-top:3px}
+.boss-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px}
+.boss-reward{font-family:var(--fu);font-size:10px;color:var(--y);white-space:nowrap}
+.boss-bar{height:9px;background:rgba(26,26,54,.9);margin-top:10px;overflow:hidden}
+.boss-fill{height:100%;background:linear-gradient(90deg,var(--r),var(--y));transition:width .8s ease;box-shadow:0 0 10px rgba(255,170,0,.35)}
+.boss-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
+.boss-progress{font-size:10px;color:var(--muted2);line-height:1.5}
+.claim-btn{padding:8px 10px;background:transparent;border:1px solid var(--y);color:var(--y);font-family:var(--fu);font-size:9px;font-weight:700;letter-spacing:.12em;cursor:pointer;white-space:nowrap}
+.claim-btn:disabled{border-color:var(--border);color:var(--muted2);cursor:default;opacity:.7}
+.dsa-counter{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;background:var(--card);border:1px solid var(--border);padding:10px 12px;margin-top:8px}
+.dsa-total{font-family:var(--fu);font-size:18px;color:var(--c);font-weight:900;text-shadow:var(--gC)}
+.tiny-btn{width:38px;height:32px;background:transparent;border:1px solid var(--c);color:var(--c);font-family:var(--fu);font-size:11px;font-weight:700;cursor:pointer}
+.ach-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.ach-card{background:var(--card);border:1px solid var(--border);padding:10px 8px;min-height:82px;text-align:center;opacity:.45;backdrop-filter:blur(6px)}
+.ach-card.unlocked{opacity:1;border-color:rgba(0,255,136,.5);background:rgba(0,255,136,.06)}
+.ach-ico{font-size:24px;line-height:1}
+.ach-name{font-family:var(--fu);font-size:9px;color:var(--text);font-weight:700;letter-spacing:.08em;margin-top:7px;line-height:1.3}
+.ach-desc{font-size:9px;color:var(--muted2);line-height:1.4;margin-top:4px}
+.ach-card.unlocked .ach-desc{color:var(--g)}
+@media (min-width:720px){.ach-grid{grid-template-columns:repeat(4,1fr)}}
+
 /* XP FLOAT */
 .xpf{position:fixed;pointer-events:none;z-index:99998;font-family:var(--fu);font-size:20px;font-weight:900;animation:xpr 1.5s ease forwards;transform:translateX(-50%)}
 .xpf.gn{color:var(--g);text-shadow:var(--gG)}.xpf.ls{color:var(--fail);text-shadow:var(--gR)}
@@ -364,6 +389,28 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 <div class="sec">
   <div class="sh">SIDE QUESTS <span style="font-size:9px;color:var(--muted2)">low XP — not the main game</span></div>
   <div class="fun-grid" id="fun-acts"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">WEEKLY BOSS FIGHT <span style="font-size:9px;color:var(--muted2)">random challenge</span></div>
+  <div id="boss-fight"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">DSA PROBLEMS <span style="font-size:9px;color:var(--muted2)">badge tracker</span></div>
+  <div class="dsa-counter">
+    <div>
+      <div class="stat-k">TOTAL SOLVED</div>
+      <div class="dsa-total" id="dsa-total">0</div>
+    </div>
+    <button class="tiny-btn" onclick="logDsaProblems(1)">+1</button>
+    <button class="tiny-btn" onclick="logDsaProblems(5)">+5</button>
+  </div>
+</div>
+
+<div class="sec">
+  <div class="sh">ACHIEVEMENT BADGES <span style="font-size:9px;color:var(--muted2)">unlocks automatically</span></div>
+  <div class="ach-grid" id="achievements"></div>
 </div>
 
 <div class="sec">
