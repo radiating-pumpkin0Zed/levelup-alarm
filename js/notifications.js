@@ -37,10 +37,33 @@ export function fireN(title, body, type = 'alarm') {
   if (!state.notifOn) return;
   if (type==='alarm'   && !state.alarmOn)   return;
   if (type==='penalty' && !state.penaltyOn) return;
+  showBrowserNotification(title, body, type);
+}
+
+function showBrowserNotification(title, body, type) {
+  const opts = {
+    body,
+    tag: 'lu3' + Date.now(),
+    requireInteraction: type !== 'complete',
+    data: { url: './' },
+  };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then(reg => reg.showNotification(title, opts))
+      .catch(e => showWindowNotification(title, opts, e));
+    return;
+  }
+  showWindowNotification(title, opts);
+}
+
+function showWindowNotification(title, opts, swError = null) {
   try {
-    const n = new Notification(title, { body, tag:'lu3'+Date.now(), requireInteraction: type!=='complete' });
+    const n = new Notification(title, opts);
     n.onclick = () => { window.focus(); n.close(); };
-  } catch (e) { addLog('Notif err: ' + e.message, 'lf'); }
+  } catch (e) {
+    const msg = swError ? `${swError.message}; ${e.message}` : e.message;
+    addLog('Notif err: ' + msg, 'lf');
+  }
 }
 
 export function schedAll() {

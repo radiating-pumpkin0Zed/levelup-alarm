@@ -182,6 +182,31 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .wbar-day{font-family:var(--fu);font-size:7px;color:var(--muted2);letter-spacing:.05em}
 .wbar-wrap.today .wbar-day{color:var(--c)}.wbar-wrap.today .wbar{border:1px solid rgba(0,255,204,.3)}
 
+/* STATS COMMAND */
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.stat-card{background:var(--card);border:1px solid var(--border);padding:10px 12px;backdrop-filter:blur(6px);min-height:68px}
+.stat-k{font-family:var(--fu);font-size:8px;color:var(--muted2);letter-spacing:.14em}
+.stat-v{font-family:var(--fu);font-size:20px;font-weight:900;color:var(--c);margin-top:6px;line-height:1.1;text-shadow:var(--gC)}
+.stat-s{font-size:10px;color:var(--text2);line-height:1.4;margin-top:4px}
+.heatmap{display:grid;grid-template-columns:repeat(12,1fr);gap:4px}
+.heat-cell{aspect-ratio:1;background:rgba(26,26,54,.8);border:1px solid rgba(66,66,140,.25);min-width:0}
+.heat-cell.h1{background:rgba(255,34,68,.35);border-color:rgba(255,34,68,.35)}
+.heat-cell.h2{background:rgba(255,170,0,.35);border-color:rgba(255,170,0,.35)}
+.heat-cell.h3{background:rgba(0,255,204,.35);border-color:rgba(0,255,204,.35)}
+.heat-cell.h4{background:rgba(0,255,136,.65);border-color:rgba(0,255,136,.5);box-shadow:0 0 8px rgba(0,255,136,.16)}
+.stats-list{display:flex;flex-direction:column;gap:6px}
+.rate-row{display:grid;grid-template-columns:minmax(0,1fr) 44px;gap:8px;align-items:center;background:var(--card);border:1px solid var(--border);padding:8px 10px}
+.rate-top{display:flex;justify-content:space-between;gap:8px;font-size:11px;color:var(--text);line-height:1.35}
+.rate-sub{font-size:9px;color:var(--muted2);margin-top:3px}
+.mini-track{height:6px;background:rgba(26,26,54,.85);margin-top:6px;overflow:hidden}
+.mini-fill{height:100%;background:linear-gradient(90deg,var(--r),var(--y),var(--g));transition:width .8s ease}
+.rate-pct{font-family:var(--fu);font-size:12px;font-weight:900;color:var(--y);text-align:right}
+.xp-graph{height:104px;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px;align-items:end;padding:8px;background:rgba(6,6,18,.72);border:1px solid var(--border)}
+.xp-bar{min-height:4px;background:linear-gradient(to top,var(--c2),var(--c));box-shadow:0 0 8px rgba(0,255,204,.18);position:relative}
+.xp-bar.today{background:linear-gradient(to top,var(--y),var(--g));box-shadow:0 0 8px rgba(0,255,136,.22)}
+.xp-empty{padding:16px;text-align:center;font-size:11px;color:var(--muted2);border:1px dashed var(--border);line-height:1.8}
+@media (min-width:720px){.stats-grid{grid-template-columns:repeat(4,1fr)}.heatmap{grid-template-columns:repeat(21,1fr)}}
+
 /* XP FLOAT */
 .xpf{position:fixed;pointer-events:none;z-index:99998;font-family:var(--fu);font-size:20px;font-weight:900;animation:xpr 1.5s ease forwards;transform:translateX(-50%)}
 .xpf.gn{color:var(--g);text-shadow:var(--gG)}.xpf.ls{color:var(--fail);text-shadow:var(--gR)}
@@ -344,6 +369,31 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 <div class="sec">
   <div class="sh">WEEKLY PERFORMANCE</div>
   <div class="week-chart" id="week-chart"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">STATS COMMAND <span style="font-size:9px;color:var(--muted2)">history + proof</span></div>
+  <div class="stats-grid" id="stats-overview"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">COMPLETION HEATMAP <span style="font-size:9px;color:var(--muted2)">last 84 days</span></div>
+  <div class="heatmap" id="heatmap"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">XP OVER TIME <span style="font-size:9px;color:var(--muted2)">estimated daily history</span></div>
+  <div id="xp-graph"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">TASK TYPES</div>
+  <div class="stats-list" id="type-rates"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">TASK COMPLETION + STREAKS</div>
+  <div class="stats-list" id="task-rates"></div>
 </div>
 
 <div class="sec">

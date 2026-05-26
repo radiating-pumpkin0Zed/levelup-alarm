@@ -1,5 +1,5 @@
 // ── Service Worker ── (save as sw.js in repo root)
-const CACHE = 'lu-v4';
+const CACHE = 'lu-v5';
 const ASSETS = ['./', './index.html', './js/app.js','./js/state.js','./js/data.js',
   './js/storage.js','./js/audio.js','./js/ui.js','./js/render.js',
   './js/notifications.js','./js/ai.js'];
@@ -17,5 +17,11 @@ self.addEventListener('fetch', e => {
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(clients.openWindow('./'));
+  const url = e.notification.data?.url || './';
+  e.waitUntil(clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
+    for (const client of list) {
+      if ('focus' in client) return client.focus();
+    }
+    return clients.openWindow(url);
+  }));
 });

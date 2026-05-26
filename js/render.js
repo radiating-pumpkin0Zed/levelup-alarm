@@ -1,7 +1,7 @@
 // ── All DOM rendering ──
 import { state }               from './state.js';
 import { SCHED, LEVELS, FUN_ACTS } from './data.js';
-import { load, initDay, analyzePatterns } from './storage.js';
+import { load, initDay, analyzePatterns, parseDayKey } from './storage.js';
 import { addLog }              from './ui.js';
 
 export const MOOD_EMOJIS = ['','😩','😟','😐','🙂','⚡'];
@@ -16,6 +16,8 @@ export function parseHM(t) { const [h,m]=t.split(':').map(Number); return h*60+m
 export function fmt12(t)   { const [h,m]=t.split(':').map(Number); const ap=h>=12?'PM':'AM'; return `${h%12||12}:${String(m).padStart(2,'0')} ${ap}`; }
 export function nowM()     { const n=new Date(); return n.getHours()*60+n.getMinutes(); }
 export function msUntil(t) { const [h,m]=t.split(':').map(Number); const n=new Date(); return new Date(n.getFullYear(),n.getMonth(),n.getDate(),h,m,0,0)-n; }
+
+const DOW_LABEL = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
 function findCurIdx(nm) {
   let idx=-1;
@@ -139,6 +141,7 @@ export function renderAll() {
 
   renderInsights();
   renderWeekChart();
+  renderStatsDashboard();
 }
 
 // ── Pattern detection render ────────────────────────────────────
@@ -188,6 +191,228 @@ export function renderWeekChart() {
     </div>`;
   }
   document.getElementById('week-chart').innerHTML = html;
+}
+
+// ── Full stats dashboard ────────────────────────────────────────
+export function renderStatsDashboard() {
+  const data = state.data || load();
+  const stats = buildStats(data);
+
+  const overview = document.getElementById('stats-overview');
+  if (overview) {
+    overview.innerHTML = [
+      statCard('AVG RATE', `${stats.avgRate}%`, `${stats.activeDays} logged day${stats.activeDays===1?'':'s'}`),
+      statCard('BEST DAY', stats.bestDow.label, `${stats.bestDow.rate}% average`),
+      statCard('WORST DAY', stats.worstDow.label, `${stats.worstDow.rate}% average`),
+      statCard('HOURS LOGGED', `${stats.totalHours}h`, `${stats.completedBlocks} completed blocks`),
+    ].join('');
+  }
+
+  renderHeatmap(stats);
+  renderXpGraph(stats);
+  renderTypeRates(stats);
+  renderTaskRates(stats);
+}
+
+function buildStats(data) {
+  const dayEntries = Object.entries(data.days || {})
+    .sort(([a], [b]) => parseDayKey(a) - parseDayKey(b));
+  const activeEntries = dayEntries.filter(([, day]) => isActiveDay(day));
+  const activeDayCount = activeEntries.length;
+
+  const taskStats = {};
+  const typeStats = {};
+  const dowStats = Array(7).fill(null).map((_, i) => ({ label:DOW_LABEL[i], totalPct:0, days:0, rate:0 }));
+  let totalDone = 0, totalPossible = activeDayCount * SCHED.length;
+  let totalMinutes = 0, completedBlocks = 0;
+
+  SCHED.forEach(task => {
+    taskStats[task.id] = {
+      task,
+      type: taskType(task),
+      total: activeDayCount,
+      completed: 0,
+      currentRun: 0,
+      bestStreak: 0,
+    };
+  });
+
+  activeEntries.forEach(([key, day]) => {
+    const tasks = day.tasks || day;
+    const done = SCHED.filter(task => tasks[task.id] === 'complete').length;
+    totalDone += done;
+    const pct = Math.round(done / SCHED.length * 100);
+    const dow = parseDayKey(key).getDay();
+    dowStats[dow].totalPct += pct;
+    dowStats[dow].days++;
+
+    SCHED.forEach((task, i) => {
+      const st = taskStats[task.id];
+      const type = st.type;
+      if (!typeStats[type]) typeStats[type] = { label:type, total:0, completed:0 };
+      typeStats[type].total++;
+
+      if (tasks[task.id] === 'complete') {
+        st.completed++;
+        st.currentRun++;
+        st.bestStreak = Math.max(st.bestStreak, st.currentRun);
+        typeStats[type].completed++;
+        completedBlocks++;
+        totalMinutes += taskDuration(i);
+      } else {
+        st.currentRun = 0;
+      }
+    });
+  });
+
+  dowStats.forEach(s => { s.rate = s.days ? Math.round(s.totalPct / s.days) : 0; });
+  const usedDows = dowStats.filter(s => s.days > 0);
+  const bestDow = usedDows.length ? usedDows.reduce((a,b) => b.rate > a.rate ? b : a) : { label:'—', rate:0 };
+  const worstDow = usedDows.length ? usedDows.reduce((a,b) => b.rate < a.rate ? b : a) : { label:'—', rate:0 };
+
+  const xpHistory = activeEntries.map(([key, day]) => ({ key, xp: estimateDayXp(day) }));
+  let runningXp = 0;
+  xpHistory.forEach(d => { runningXp = Math.max(0, runningXp + d.xp); d.total = runningXp; });
+
+  return {
+    activeDays: activeDayCount,
+    avgRate: totalPossible ? Math.round(totalDone / totalPossible * 100) : 0,
+    bestDow,
+    worstDow,
+    totalHours: (totalMinutes / 60).toFixed(1),
+    completedBlocks,
+    taskStats: Object.values(taskStats).map(s => ({
+      ...s,
+      rate: s.total ? Math.round(s.completed / s.total * 100) : 0,
+    })),
+    typeStats: Object.values(typeStats).map(s => ({
+      ...s,
+      rate: s.total ? Math.round(s.completed / s.total * 100) : 0,
+    })).sort((a,b) => b.rate - a.rate),
+    xpHistory,
+  };
+}
+
+function renderHeatmap(stats) {
+  const el = document.getElementById('heatmap');
+  if (!el) return;
+  const today = new Date();
+  const cells = [];
+  for (let i = 83; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const key = dateKey(d);
+    const day = state.data.days?.[key];
+    const pct = dayCompletionPct(day);
+    const active = day && isActiveDay(day);
+    const done = day ? SCHED.filter(task => (day.tasks || day)[task.id] === 'complete').length : 0;
+    const cls = !active ? 'h0' : pct >= 85 ? 'h4' : pct >= 55 ? 'h3' : pct > 0 ? 'h2' : 'h1';
+    cells.push(`<div class="heat-cell ${cls}" title="${key}: ${active ? pct+'% ('+done+'/'+SCHED.length+')' : 'no logged tasks'}"></div>`);
+  }
+  el.innerHTML = cells.join('');
+}
+
+function renderXpGraph(stats) {
+  const el = document.getElementById('xp-graph');
+  if (!el) return;
+  const rows = stats.xpHistory.slice(-21);
+  if (!rows.length) {
+    el.innerHTML = '<div class="xp-empty">No XP history yet. Complete tasks to build the graph.</div>';
+    return;
+  }
+  const max = Math.max(...rows.map(r => r.total), 1);
+  el.innerHTML = `<div class="xp-graph">${rows.map(r => {
+    const h = Math.max(4, Math.round(r.total / max * 88));
+    return `<div class="xp-bar${r.key===state.todayStr?' today':''}" style="height:${h}px" title="${r.key}: ${r.total} XP total, ${r.xp >= 0 ? '+' : ''}${r.xp} XP day"></div>`;
+  }).join('')}</div>`;
+}
+
+function renderTypeRates(stats) {
+  const el = document.getElementById('type-rates');
+  if (!el) return;
+  if (!stats.typeStats.length) {
+    el.innerHTML = '<div class="xp-empty">No task type data yet.</div>';
+    return;
+  }
+  el.innerHTML = stats.typeStats.map(s => rateRow(s.label, s.rate, `${s.completed}/${s.total} completed`)).join('');
+}
+
+function renderTaskRates(stats) {
+  const el = document.getElementById('task-rates');
+  if (!el) return;
+  if (!stats.activeDays) {
+    el.innerHTML = '<div class="xp-empty">No task history yet. Finish a few days and this gets interesting.</div>';
+    return;
+  }
+  el.innerHTML = stats.taskStats
+    .sort((a,b) => a.rate - b.rate || b.task.xp - a.task.xp)
+    .map(s => rateRow(`${s.task.emoji} ${s.task.label}`, s.rate, `${s.completed}/${s.total} days · best streak ${s.bestStreak}`))
+    .join('');
+}
+
+function statCard(k, v, s) {
+  return `<div class="stat-card"><div class="stat-k">${k}</div><div class="stat-v">${v}</div><div class="stat-s">${s}</div></div>`;
+}
+
+function rateRow(label, rate, sub) {
+  return `<div class="rate-row">
+    <div>
+      <div class="rate-top"><span>${label}</span></div>
+      <div class="mini-track"><div class="mini-fill" style="width:${rate}%"></div></div>
+      <div class="rate-sub">${sub}</div>
+    </div>
+    <div class="rate-pct">${rate}%</div>
+  </div>`;
+}
+
+function isActiveDay(day) {
+  if (!day) return false;
+  const tasks = day.tasks || day;
+  return SCHED.some(task => tasks[task.id] === 'complete' || tasks[task.id] === 'failed');
+}
+
+function dayCompletionPct(day) {
+  if (!day || !isActiveDay(day)) return 0;
+  const tasks = day.tasks || day;
+  const done = SCHED.filter(task => tasks[task.id] === 'complete').length;
+  return Math.round(done / SCHED.length * 100);
+}
+
+function taskDuration(i) {
+  const cur = parseHM(SCHED[i].time);
+  const next = i < SCHED.length - 1 ? parseHM(SCHED[i+1].time) : cur + 30;
+  return Math.max(0, next - cur);
+}
+
+function taskType(task) {
+  const label = task.label.toLowerCase();
+  if (/dsa|leetcode/.test(label)) return 'DSA';
+  if (/web development/.test(label)) return 'Web Dev';
+  if (/project/.test(label)) return 'Projects';
+  if (/english|typing/.test(label)) return 'English';
+  if (/creative|editing|pixel/.test(label)) return 'Creative';
+  if (/revision|coding/.test(label)) return 'Revision';
+  if (/exercise|walk|stretch|breakfast|lunch|dinner|sleep|screens|lights/.test(label)) return 'Health';
+  if (/planning|evaluation/.test(label)) return 'Planning';
+  return 'Recovery';
+}
+
+function estimateDayXp(day) {
+  const tasks = day.tasks || day;
+  const awards = day.xpAwards || {};
+  let xp = 0;
+  SCHED.forEach(task => {
+    if (tasks[task.id] === 'complete') xp += awards[task.id] ?? task.xp;
+    if (tasks[task.id] === 'failed' && task.penalty) xp -= 25;
+  });
+  FUN_ACTS.forEach(act => { xp += (day.funActs?.[act.id] || 0) * act.xp; });
+  if (day.rewards?.allComplete || SCHED.every(task => tasks[task.id] === 'complete')) xp += 300;
+  if (day.rewards?.debrief) xp += 35;
+  return xp;
+}
+
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 // ── Clock ───────────────────────────────────────────────────────
