@@ -1,5 +1,5 @@
 // ── Service Worker ── (save as sw.js in repo root)
-const CACHE = 'lu-v5';
+const CACHE = 'lu-v6';
 const ASSETS = ['./', './index.html', './js/app.js','./js/state.js','./js/data.js',
   './js/storage.js','./js/audio.js','./js/ui.js','./js/render.js',
   './js/notifications.js','./js/ai.js'];

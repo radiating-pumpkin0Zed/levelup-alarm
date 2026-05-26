@@ -24,6 +24,10 @@ export function beep(freq = 440, dur = 0.15, type = 'square', vol = 0.25) {
 export function alarmBeep()   { [440,550,660,880].forEach((f,i) => setTimeout(() => beep(f, 0.15), i*120)); }
 export function penaltyBeep() { [220,180,150].forEach((f,i)     => setTimeout(() => beep(f, 0.25,'sawtooth'), i*150)); }
 export function completeBeep(){ [440,660,880,1100].forEach((f,i) => setTimeout(() => beep(f, 0.1,'sine'), i*80)); }
+export function undoBeep()    { [330,260].forEach((f,i)          => setTimeout(() => beep(f, 0.12,'triangle',0.18), i*90)); }
+export function missionBeep() { [523,659,784,1047].forEach((f,i)=> setTimeout(() => beep(f, 0.13,'triangle',0.22), i*85)); }
+export function bossBeep()    { [196,392,587,784,1175].forEach((f,i)=> setTimeout(() => beep(f, 0.16, i<2?'sawtooth':'square',0.24), i*105)); }
+export function badgeBeep()   { [880,1175,1568].forEach((f,i)    => setTimeout(() => beep(f, 0.09,'sine',0.2), i*70)); }
 
 export function vibrate(pattern) {
   if ('vibrate' in navigator) navigator.vibrate(pattern);
@@ -70,6 +74,6 @@ export async function toggleSound() {
   const d = load(); d.settings = d.settings || {}; d.settings.sound = state.soundOn; save(d);
   document.getElementById('sound-btn').textContent = state.soundOn ? '🔊' : '🔇';
   document.getElementById('tog-sound').className = 'toggle' + (state.soundOn ? ' on' : '');
-  if (state.soundOn) { initAudio(); beep(660, 0.1, 'sine'); }
-  toast(state.soundOn ? 'SOUND ON' : 'SOUND OFF', state.soundOn ? 'Beeps activated.' : 'Silent mode.', true);
+  if (state.soundOn) { initAudio(); missionBeep(); }
+  toast(state.soundOn ? 'SOUND ON' : 'SOUND OFF', state.soundOn ? 'Arcade noises activated. Very serious productivity technology.' : 'Silent mode. The drama remains internal.', true);
 }

@@ -209,13 +209,17 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 
 /* GAMIFICATION */
 .boss-card{background:linear-gradient(135deg,rgba(255,0,64,.13),rgba(0,255,204,.06)),var(--card);border:1px solid rgba(255,0,64,.45);border-left:3px solid var(--r);padding:12px 14px;backdrop-filter:blur(8px)}
+.daily-card{background:linear-gradient(135deg,rgba(255,170,0,.13),rgba(0,255,136,.06)),var(--card);border:1px solid rgba(255,170,0,.42);border-left:3px solid var(--y);padding:12px 14px;backdrop-filter:blur(8px)}
+.daily-card.done{border-left-color:var(--g);border-color:rgba(0,255,136,.42)}
 .boss-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
-.boss-name{font-family:var(--fu);font-size:13px;font-weight:900;color:var(--r);letter-spacing:.08em;text-shadow:var(--gR)}
+.boss-name,.daily-name{font-family:var(--fu);font-size:13px;font-weight:900;color:var(--r);letter-spacing:.08em;text-shadow:var(--gR)}
+.daily-name{color:var(--y);text-shadow:var(--gY)}
 .boss-week{font-family:var(--fu);font-size:8px;color:var(--muted2);letter-spacing:.14em;margin-top:3px}
-.boss-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px}
-.boss-reward{font-family:var(--fu);font-size:10px;color:var(--y);white-space:nowrap}
+.boss-desc,.daily-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px}
+.boss-reward,.daily-reward{font-family:var(--fu);font-size:10px;color:var(--y);white-space:nowrap}
 .boss-bar{height:9px;background:rgba(26,26,54,.9);margin-top:10px;overflow:hidden}
-.boss-fill{height:100%;background:linear-gradient(90deg,var(--r),var(--y));transition:width .8s ease;box-shadow:0 0 10px rgba(255,170,0,.35)}
+.boss-fill,.daily-fill{height:100%;background:linear-gradient(90deg,var(--r),var(--y));transition:width .8s ease;box-shadow:0 0 10px rgba(255,170,0,.35)}
+.daily-fill{background:linear-gradient(90deg,var(--y),var(--g))}
 .boss-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px}
 .boss-progress{font-size:10px;color:var(--muted2);line-height:1.5}
 .claim-btn{padding:8px 10px;background:transparent;border:1px solid var(--y);color:var(--y);font-family:var(--fu);font-size:9px;font-weight:700;letter-spacing:.12em;cursor:pointer;white-space:nowrap}
@@ -389,6 +393,11 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 <div class="sec">
   <div class="sh">SIDE QUESTS <span style="font-size:9px;color:var(--muted2)">low XP — not the main game</span></div>
   <div class="fun-grid" id="fun-acts"></div>
+</div>
+
+<div class="sec">
+  <div class="sh">DAILY RANDOM MISSION <span style="font-size:9px;color:var(--muted2)">bonus XP bait</span></div>
+  <div id="daily-mission"></div>
 </div>
 
 <div class="sec">

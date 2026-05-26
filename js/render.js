@@ -19,6 +19,42 @@ export function msUntil(t) { const [h,m]=t.split(':').map(Number); const n=new D
 
 const DOW_LABEL = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
 
+const DAILY_MISSIONS = [
+  {
+    id:'webBeforeNoon', name:'SHIP BEFORE LUNCH', reward:75,
+    desc:'Complete Web Development before 12:00 PM today. Tutorial binge-watching does not count; press DONE like an adult.',
+    calc: day => timedTaskProgress(day, '1030', 12*60),
+  },
+  {
+    id:'dsaBeforeTen', name:'ALGORITHM BREAKFAST', reward:65,
+    desc:'Complete DSA / LeetCode before 10:00 AM today. Yes, before the excuses have coffee.',
+    calc: day => timedTaskProgress(day, '0815', 10*60),
+  },
+  {
+    id:'threeBeforeNoon', name:'MORNING SNOWBALL', reward:70,
+    desc:'Complete any 3 tasks before 12:00 PM today. Build momentum before the day starts negotiating.',
+    calc: day => timedCompletedCount(day, 12*60, 3),
+  },
+  {
+    id:'projectBeforeDinner', name:'PORTFOLIO BEFORE NOODLES', reward:80,
+    desc:'Complete Project Building before 7:00 PM today. Your future portfolio would like to exist, allegedly.',
+    calc: day => timedTaskProgress(day, '1700', 19*60),
+  },
+  {
+    id:'fiveClean', name:'CLEAN COMBO', reward:60,
+    desc:'Complete 5 tasks today with zero undo. A rare sighting of commitment in the wild.',
+    calc: day => {
+      const n = day?.undoCount ? 0 : completedCount(day);
+      return { current:Math.min(n, 5), target:5, label:day?.undoCount ? 'combo broken by undo' : `${Math.min(n,5)}/5 clean tasks` };
+    },
+  },
+  {
+    id:'dsaFive', name:'FIVE-PROBLEM MINI BOSS', reward:70,
+    desc:'Log 5 DSA problems today. Tiny arena, real reps.',
+    calc: day => ({ current:Math.min(day?.dsaProblems || 0, 5), target:5, label:`${day?.dsaProblems || 0}/5 problems` }),
+  },
+];
+
 function findCurIdx(nm) {
   let idx=-1;
   for(let i=0;i<SCHED.length;i++){ if(parseHM(SCHED[i].time)<=nm) idx=i; else break; }
@@ -477,8 +513,18 @@ export function renderGamification() {
   const data = state.data || load();
   const dsaEl = document.getElementById('dsa-total');
   if (dsaEl) dsaEl.textContent = data.stats?.dsaProblems || 0;
+  renderDailyMission(data);
   renderBossFight(data);
   renderAchievements(data);
+}
+
+export function getDailyMissionStatus(data, todayStr = state.todayStr) {
+  const mission = DAILY_MISSIONS[hashString(todayStr) % DAILY_MISSIONS.length];
+  const day = data.days?.[todayStr];
+  const progress = mission.calc(day);
+  const complete = progress.current >= progress.target;
+  const claimed = !!data.dailyMissionRewards?.[todayStr];
+  return { ...mission, dateKey:todayStr, progress, complete, claimed };
 }
 
 export function getWeeklyBossStatus(data, todayStr = state.todayStr) {
@@ -489,6 +535,27 @@ export function getWeeklyBossStatus(data, todayStr = state.todayStr) {
   const complete = progress.current >= progress.target;
   const claimed = !!data.bossRewards?.[week.key];
   return { ...boss, weekKey:week.key, label:week.label, progress, complete, claimed };
+}
+
+function renderDailyMission(data) {
+  const el = document.getElementById('daily-mission');
+  if (!el) return;
+  const mission = getDailyMissionStatus(data);
+  const pct = Math.min(100, Math.round(mission.progress.current / mission.progress.target * 100));
+  const btn = mission.claimed
+    ? '<button class="claim-btn" disabled>PAID OUT</button>'
+    : mission.complete
+      ? '<button class="claim-btn" onclick="claimDailyMission()">CLAIM XP</button>'
+      : '<button class="claim-btn" disabled>NOT YET</button>';
+  el.innerHTML = `<div class="daily-card${mission.complete?' done':''}">
+    <div class="boss-top">
+      <div><div class="daily-name">${mission.name}</div><div class="boss-week">${mission.dateKey}</div></div>
+      <div class="daily-reward">+${mission.reward} XP</div>
+    </div>
+    <div class="daily-desc">${mission.desc}</div>
+    <div class="boss-bar"><div class="daily-fill" style="width:${pct}%"></div></div>
+    <div class="boss-foot"><div class="boss-progress">${mission.progress.label}</div>${btn}</div>
+  </div>`;
 }
 
 function renderBossFight(data) {
@@ -584,6 +651,26 @@ function taskDone(day, id) {
 
 function isFullDay(day) {
   return completedCount(day) === SCHED.length;
+}
+
+function timedTaskProgress(day, id, limitMinutes) {
+  const ok = taskDone(day, id) && completionMinute(day, id) <= limitMinutes;
+  return { current:ok ? 1 : 0, target:1, label:ok ? 'complete in time' : '0/1 on-time clears' };
+}
+
+function timedCompletedCount(day, limitMinutes, target) {
+  if (!day) return { current:0, target, label:`0/${target} before noon` };
+  const tasks = day.tasks || day;
+  const n = SCHED.filter(task => tasks[task.id] === 'complete' && completionMinute(day, task.id) <= limitMinutes).length;
+  return { current:Math.min(n, target), target, label:`${n}/${target} before noon` };
+}
+
+function completionMinute(day, id) {
+  const raw = day?.completedAt?.[id];
+  if (!raw) return 24 * 60 + 1;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return 24 * 60 + 1;
+  return d.getHours() * 60 + d.getMinutes();
 }
 
 // ── Clock ───────────────────────────────────────────────────────

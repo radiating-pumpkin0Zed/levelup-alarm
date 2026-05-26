@@ -1,13 +1,13 @@
 // ── Main app logic + boot ──
 import { state }                     from './state.js';
 import { SCHED, LEVELS, QUOTES, FUN_ACTS } from './data.js';
-import { load, save, todayKey, initDay }    from './storage.js';
-import { acquireWakeLock, toggleWakeLock, toggleSound } from './audio.js';
+import { load, save, todayKey, initDay, parseDayKey }    from './storage.js';
+import { acquireWakeLock, toggleWakeLock, toggleSound, undoBeep, missionBeep, bossBeep, badgeBeep } from './audio.js';
 import { toast, addLog, setSt, openPanel, closePanel,
          openDebrief as _openDebrief, closeDebrief,
          setBg, togNotif, togPenalty } from './ui.js';
 import { renderAll, renderInsights, updClock,
-         flashT, xpFloat, getLvl, getLvlInfo, msUntil, getWeeklyBossStatus } from './render.js';
+         flashT, xpFloat, getLvl, getWeeklyBossStatus, getDailyMissionStatus } from './render.js';
 import { reqPerm, fireN, schedAll, checkMissedAlarms, startPeriodicCheck } from './notifications.js';
 import { submitDebrief } from './ai.js';
 
@@ -41,6 +41,7 @@ window.resetAll       = resetAll;
 window.closeLvl       = closeLvl;
 window.logDsaProblems = logDsaProblems;
 window.claimBossReward= claimBossReward;
+window.claimDailyMission= claimDailyMission;
 
 // ── Task completion ────────────────────────────────────
 function markDone(id) {
@@ -51,6 +52,7 @@ function markDone(id) {
 
   const wasFail = dy.tasks[id] === 'failed';
   dy.tasks[id]  = 'complete';
+  dy.completedAt[id] = new Date().toISOString();
   const xpGain  = wasFail ? Math.floor(task.xp*.5) : task.xp;
   const pXP     = state.data.stats.totalXP || 0;
   const pLvl    = getLvl(pXP);
@@ -60,13 +62,15 @@ function markDone(id) {
   if (SCHED.every(t=>dy.tasks[t.id]==='complete') && !dy.rewards.allComplete) {
     state.data.stats.totalXP += 300;
     dy.rewards.allComplete = true;
-    updStreak();
+    recomputeStreak(state.data);
     fireN('🏆 ALL TASKS COMPLETE!','Every task done. +300 bonus XP. Streak extended!','complete');
-    addLog('ALL DONE! +300 BONUS XP','lg');
+    badgeBeep();
+    addLog('ALL DONE! +300 BONUS XP. The schedule has been briefly humiliated.','lg');
   }
+  tryAwardDailyMission(state.data);
   save(state.data); renderAll();
   flashT(id,'g'); xpFloat(xpGain, document.getElementById('ti-'+id));
-  fireN(`✅ DONE: ${task.label}`, `+${xpGain} XP${wasFail?' (partial)':'. Keep going.'}`, 'complete');
+  fireN(`✅ DONE: ${task.label}`, `+${xpGain} XP${wasFail?' (partial redemption arc).':'. A tiny responsible adult has appeared.'}`, 'complete');
   addLog(`COMPLETE: ${task.label} (+${xpGain} XP)`,'lg');
   const nLvl = getLvl(state.data.stats.totalXP);
   if (nLvl > pLvl) lvlUp(nLvl);
@@ -80,15 +84,19 @@ function markUndo(id) {
   dy.tasks[id] = 'pending';
   const xpLoss = dy.xpAwards?.[id] ?? task.xp;
   if (dy.xpAwards) delete dy.xpAwards[id];
+  if (dy.completedAt) delete dy.completedAt[id];
   dy.undoCount = (dy.undoCount || 0) + 1;
   state.data.stats.totalXP = Math.max(0,(state.data.stats.totalXP||0)-xpLoss);
   if (dy.rewards?.allComplete) {
     dy.rewards.allComplete = false;
     state.data.stats.totalXP = Math.max(0, (state.data.stats.totalXP||0) - 300);
-    addLog('ALL DONE bonus removed until the day is complete again.','ly');
+    recomputeStreak(state.data);
+    addLog('ALL DONE bonus removed. The victory parade has been asked to leave.','ly');
   }
+  revokeDailyMissionIfBroken(state.data);
   save(state.data); renderAll();
-  addLog(`UNDONE: ${task.label} (−${xpLoss} XP)`,'ly');
+  undoBeep();
+  addLog(`UNDONE: ${task.label} (−${xpLoss} XP). Time travel remains expensive.`,'ly');
 }
 
 // ── Mood tracking ──────────────────────────────────────
@@ -133,9 +141,54 @@ function logDsaProblems(count) {
   const dy = initDay(state.data, state.todayStr);
   dy.dsaProblems = (dy.dsaProblems || 0) + n;
   state.data.stats.dsaProblems = (state.data.stats.dsaProblems || 0) + n;
+  tryAwardDailyMission(state.data);
   save(state.data); renderAll();
-  addLog(`DSA PROBLEMS: +${n} solved (${state.data.stats.dsaProblems} total)`,'lg');
-  toast('DSA LOGGED', `+${n} problem${n===1?'':'s'} logged. Badge progress updated.`, true);
+  missionBeep();
+  addLog(`DSA PROBLEMS: +${n} solved (${state.data.stats.dsaProblems} total). Brain wrinkles pending.`,'lg');
+  toast('DSA LOGGED', `+${n} problem${n===1?'':'s'} logged. Badge progress updated, ego mildly justified.`, true);
+}
+
+// ── Daily random mission ────────────────────────────────────────
+function claimDailyMission() {
+  state.data = load();
+  initDay(state.data, state.todayStr);
+  const awarded = tryAwardDailyMission(state.data);
+  save(state.data); renderAll();
+  if (!awarded) {
+    const mission = getDailyMissionStatus(state.data, state.todayStr);
+    toast('MISSION LOCKED', mission.claimed ? 'Already paid out today. Nice try, accountant.' : 'Finish the daily mission first.', false, true);
+  }
+}
+
+function tryAwardDailyMission(data) {
+  const dy = initDay(data, state.todayStr);
+  const mission = getDailyMissionStatus(data, state.todayStr);
+  if (!mission.complete || mission.claimed) return false;
+  const pXP = data.stats.totalXP || 0;
+  const pLvl = getLvl(pXP);
+  data.stats.totalXP = pXP + mission.reward;
+  data.dailyMissionRewards = data.dailyMissionRewards || {};
+  data.dailyMissionRewards[state.todayStr] = { id:mission.id, reward:mission.reward, claimedAt:new Date().toISOString() };
+  dy.rewards.dailyMission = mission.id;
+  missionBeep();
+  xpFloat(mission.reward, document.getElementById('daily-mission'));
+  addLog(`DAILY MISSION CLEARED: ${mission.name} (+${mission.reward} XP)`,'lg');
+  toast('DAILY MISSION CLEARED', `${mission.name}. +${mission.reward} XP. Look at you, weaponizing punctuality.`, true);
+  const nLvl = getLvl(data.stats.totalXP);
+  if (nLvl > pLvl) lvlUp(nLvl);
+  return true;
+}
+
+function revokeDailyMissionIfBroken(data) {
+  const entry = data.dailyMissionRewards?.[state.todayStr];
+  if (!entry) return;
+  const mission = getDailyMissionStatus(data, state.todayStr);
+  if (mission.complete) return;
+  data.stats.totalXP = Math.max(0, (data.stats.totalXP || 0) - (entry.reward || mission.reward));
+  delete data.dailyMissionRewards[state.todayStr];
+  const dy = initDay(data, state.todayStr);
+  if (dy.rewards) delete dy.rewards.dailyMission;
+  addLog('DAILY MISSION reward revoked. The app noticed the little undo maneuver.','ly');
 }
 
 // ── Weekly boss reward ──────────────────────────────────────────
@@ -154,22 +207,37 @@ function claimBossReward() {
   state.data.bossRewards[boss.weekKey] = { id:boss.id, reward:boss.reward, claimedAt:new Date().toISOString() };
   save(state.data); renderAll();
   xpFloat(boss.reward, document.getElementById('boss-fight'));
-  addLog(`BOSS CLEARED: ${boss.name} (+${boss.reward} XP)`,'lg');
-  toast('BOSS CLEARED', `${boss.name} defeated. +${boss.reward} XP.`, true);
+  bossBeep();
+  addLog(`BOSS CLEARED: ${boss.name} (+${boss.reward} XP). The weekly menace has been folded.`, 'lg');
+  toast('BOSS CLEARED', `${boss.name} defeated. +${boss.reward} XP. Extremely unnecessary. Extremely good.`, true);
   const nLvl = getLvl(state.data.stats.totalXP);
   if (nLvl > pLvl) lvlUp(nLvl);
 }
 
 // ── Streak ─────────────────────────────────────────────
-function updStreak() {
-  const y=new Date(); y.setDate(y.getDate()-1);
-  const yk=`${y.getFullYear()}-${String(y.getMonth()+1).padStart(2,'0')}-${String(y.getDate()).padStart(2,'0')}`;
-  const last=state.data.stats.lastDate;
-  if (last===yk||!last) state.data.stats.streak=(state.data.stats.streak||0)+1;
-  else if (last!==state.todayStr) state.data.stats.streak=1;
-  state.data.stats.bestStreak=Math.max(state.data.stats.streak,state.data.stats.bestStreak||0);
-  state.data.stats.lastDate=state.todayStr;
-  save(state.data);
+function recomputeStreak(data) {
+  const fullDays = new Set(Object.entries(data.days || {})
+    .filter(([, dy]) => dy?.tasks && SCHED.every(t => dy.tasks[t.id] === 'complete'))
+    .map(([k]) => k));
+
+  let cur = 0;
+  for (let d = parseDayKey(state.todayStr); fullDays.has(dayKey(d)); d.setDate(d.getDate() - 1)) cur++;
+
+  let best = 0;
+  fullDays.forEach(k => {
+    let run = 0;
+    for (let d = parseDayKey(k); fullDays.has(dayKey(d)); d.setDate(d.getDate() - 1)) run++;
+    best = Math.max(best, run);
+  });
+
+  const todayFull = fullDays.has(state.todayStr);
+  data.stats.streak = todayFull ? cur : 0;
+  data.stats.bestStreak = Math.max(data.stats.bestStreak || 0, best);
+  data.stats.lastDate = todayFull ? state.todayStr : data.stats.lastDate;
+}
+
+function dayKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
 // ── Level up overlay ───────────────────────────────────
@@ -202,6 +270,7 @@ function resetDay(){
   if(!confirm("Reset ALL of today's tasks? Cannot be undone."))return;
   state.data=load(); delete state.data.days[state.todayStr]; save(state.data);
   state.data=load(); initDay(state.data,state.todayStr); save(state.data);
+  recomputeStreak(state.data); save(state.data);
   renderAll(); addLog('Today reset.','ly'); toast('RESET','Fresh start.',true);
 }
 
