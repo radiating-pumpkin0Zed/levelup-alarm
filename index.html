@@ -7,6 +7,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="LEVEL UP"/>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<link rel="icon" href="./icons/icon-192.png"/>
+<link rel="apple-touch-icon" href="./icons/icon-192.png"/>
 <title>LEVEL UP // SYSTEM</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Bebas+Neue&display=swap" rel="stylesheet"/>
@@ -131,6 +134,9 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .tlbl{font-size:13px;color:var(--text);line-height:1.3;font-weight:bold}
 .ti.tdone .tlbl{text-decoration:line-through;color:var(--muted2)}.ti.tfail .tlbl{color:var(--fail)}
 .txp{font-size:10px;color:var(--muted2)}
+.task-meta{display:flex;flex-wrap:wrap;gap:4px;margin-top:3px}
+.task-chip{font-family:var(--fu);font-size:7px;color:var(--c);border:1px solid rgba(0,255,204,.28);background:rgba(0,255,204,.06);padding:2px 5px;letter-spacing:.06em}
+.ti.tdone .task-chip{color:var(--g);border-color:rgba(0,255,136,.28);background:rgba(0,255,136,.06)}
 .tright{padding:8px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;flex-shrink:0;border-left:1px solid var(--border);min-width:70px}
 .badge{font-family:var(--fu);font-size:8px;font-weight:700;padding:3px 7px;letter-spacing:.08em}
 .bnow{background:var(--c);color:#000;animation:blk 1s step-end infinite}
@@ -140,6 +146,30 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 .bcomp{border-color:var(--g);color:var(--g)}.bcomp:active{background:var(--g);color:#000}
 .bundo{border-color:var(--muted2);color:var(--muted2);font-size:8px}.bundo:active{background:var(--muted2);color:#000}
 .bredo{border-color:var(--y);color:var(--y)}.bredo:active{background:var(--y);color:#000}
+.binfo{border-color:var(--c);color:var(--c);font-size:8px}
+.binfo:active{background:var(--c);color:#000}
+
+/* TASK DETAIL */
+.task-detail-head{display:flex;align-items:flex-start;gap:10px;margin:12px 0}
+.task-detail-emoji{font-size:28px;line-height:1}
+.task-detail-title{font-family:var(--fu);font-size:14px;font-weight:900;color:var(--text);letter-spacing:.08em;line-height:1.35}
+.task-detail-sub{font-size:10px;color:var(--muted2);margin-top:4px;line-height:1.5}
+.pomo-box{background:var(--card);border:1px solid var(--border);padding:12px;margin-top:8px}
+.pomo-time{font-family:var(--fu);font-size:30px;font-weight:900;color:var(--c);text-shadow:var(--gC);line-height:1}
+.pomo-mode{font-size:9px;color:var(--muted2);letter-spacing:.16em;margin-top:4px}
+.pomo-actions,.diff-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.mini-action{background:transparent;border:1px solid var(--border2);color:var(--text2);font-family:var(--fu);font-size:9px;font-weight:700;padding:9px 6px;cursor:pointer;letter-spacing:.08em}
+.mini-action.on,.mini-action:active{border-color:var(--c);color:var(--c);background:rgba(0,255,204,.08)}
+.task-textarea{width:100%;min-height:110px;background:rgba(6,6,18,.8);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:13px;line-height:1.6;padding:10px;resize:vertical}
+.subtask-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;background:var(--card);border:1px solid var(--border);padding:8px 10px;margin-top:6px}
+.subtask-row.done{opacity:.6}.subtask-row.done .subtask-label{text-decoration:line-through;color:var(--muted2)}
+.subtask-check{width:24px;height:24px;background:transparent;border:1px solid var(--c);color:var(--c);cursor:pointer}
+.subtask-label{font-size:12px;color:var(--text2);line-height:1.4}
+.subtask-del{background:transparent;border:1px solid var(--fail);color:var(--fail);width:26px;height:24px;cursor:pointer}
+.subtask-add{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px;margin-top:8px}
+.subtask-input{background:rgba(6,6,18,.8);border:1px solid var(--border);color:var(--text);font-family:var(--fm);font-size:12px;padding:9px}
+.time-proof{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:8px}
+.time-proof .stat-card{min-height:56px}
 
 /* MOOD TRACKER */
 .mood-row{padding:6px 12px 8px 12px;border-top:1px solid var(--border);background:rgba(0,0,0,.15);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -418,38 +448,8 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
 </div>
 
 <div class="sec">
-  <div class="sh">ACHIEVEMENT BADGES <span style="font-size:9px;color:var(--muted2)">unlocks automatically</span></div>
-  <div class="ach-grid" id="achievements"></div>
-</div>
-
-<div class="sec">
   <div class="sh">WEEKLY PERFORMANCE</div>
   <div class="week-chart" id="week-chart"></div>
-</div>
-
-<div class="sec">
-  <div class="sh">STATS COMMAND <span style="font-size:9px;color:var(--muted2)">history + proof</span></div>
-  <div class="stats-grid" id="stats-overview"></div>
-</div>
-
-<div class="sec">
-  <div class="sh">COMPLETION HEATMAP <span style="font-size:9px;color:var(--muted2)">last 84 days</span></div>
-  <div class="heatmap" id="heatmap"></div>
-</div>
-
-<div class="sec">
-  <div class="sh">XP OVER TIME <span style="font-size:9px;color:var(--muted2)">estimated daily history</span></div>
-  <div id="xp-graph"></div>
-</div>
-
-<div class="sec">
-  <div class="sh">TASK TYPES</div>
-  <div class="stats-list" id="type-rates"></div>
-</div>
-
-<div class="sec">
-  <div class="sh">TASK COMPLETION + STREAKS</div>
-  <div class="stats-list" id="task-rates"></div>
 </div>
 
 <div class="sec">
@@ -467,6 +467,15 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
   <div class="lvtxt">LEVEL UP!</div>
   <div class="lvsub" id="lvsub">LEVEL 2</div>
   <button class="lvclose" onclick="closeLvl()">[ CONTINUE ]</button>
+</div>
+
+<!-- TASK DETAIL PANEL -->
+<div class="panel-overlay" id="task-overlay" onclick="closeTaskDetail()"></div>
+<div class="panel" id="task-panel" onclick="event.stopPropagation()">
+  <button class="panel-close" onclick="closeTaskDetail()">✕</button>
+  <div class="panel-title">TASK OPS</div>
+  <div class="panel-sub">POMODORO // NOTES // PROOF</div>
+  <div id="task-detail"></div>
 </div>
 
 <!-- SETTINGS PANEL — onclick="event.stopPropagation()" prevents overlay click-through -->
@@ -495,6 +504,18 @@ body::after{content:"";position:fixed;inset:0;background:repeating-linear-gradie
   <div class="toggle-row">Alarm Notifications<button class="toggle on" id="tog-notif" onclick="togNotif()"></button></div>
   <div class="toggle-row">Penalty Alerts<button class="toggle on" id="tog-penalty" onclick="togPenalty()"></button></div>
   <div class="toggle-row">Sound Effects<button class="toggle" id="tog-sound" onclick="toggleSound()"></button></div>
+  <div class="panel-sec">ACHIEVEMENTS</div>
+  <div class="ach-grid" id="achievements"></div>
+  <div class="panel-sec">STATS COMMAND</div>
+  <div class="stats-grid" id="stats-overview"></div>
+  <div class="panel-sec">COMPLETION HEATMAP</div>
+  <div class="heatmap" id="heatmap"></div>
+  <div class="panel-sec">XP OVER TIME</div>
+  <div id="xp-graph"></div>
+  <div class="panel-sec">TASK TYPES</div>
+  <div class="stats-list" id="type-rates"></div>
+  <div class="panel-sec">TASK COMPLETION + STREAKS</div>
+  <div class="stats-list" id="task-rates"></div>
   <div class="panel-sec">DANGER ZONE</div>
   <button class="sbtn" style="width:100%;margin:0" onclick="resetAll()">[ RESET ALL DATA ]</button>
 </div>

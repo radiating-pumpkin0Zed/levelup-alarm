@@ -42,6 +42,16 @@ window.closeLvl       = closeLvl;
 window.logDsaProblems = logDsaProblems;
 window.claimBossReward= claimBossReward;
 window.claimDailyMission= claimDailyMission;
+window.openTaskDetail = openTaskDetail;
+window.closeTaskDetail= closeTaskDetail;
+window.saveTaskNotes  = saveTaskNotes;
+window.setTaskDifficulty = setTaskDifficulty;
+window.addSubtask     = addSubtask;
+window.toggleSubtask  = toggleSubtask;
+window.deleteSubtask  = deleteSubtask;
+window.startPomodoro  = startPomodoro;
+window.pausePomodoro  = pausePomodoro;
+window.resetPomodoro  = resetPomodoro;
 
 // ── Task completion ────────────────────────────────────
 function markDone(id) {
@@ -52,8 +62,13 @@ function markDone(id) {
 
   const wasFail = dy.tasks[id] === 'failed';
   dy.tasks[id]  = 'complete';
-  dy.completedAt[id] = new Date().toISOString();
-  const xpGain  = wasFail ? Math.floor(task.xp*.5) : task.xp;
+  const doneAt = new Date().toISOString();
+  dy.completedAt[id] = doneAt;
+  if (!dy.timeLogs[id]) dy.timeLogs[id] = {};
+  if (!dy.timeLogs[id].startAt) dy.timeLogs[id].startAt = activePomodoroStart(dy.pomodoro?.[id]) || doneAt;
+  dy.timeLogs[id].endAt = doneAt;
+  pausePomodoroForDay(dy, id);
+  const xpGain  = calculateTaskXp(task, dy.difficulty[id], wasFail);
   const pXP     = state.data.stats.totalXP || 0;
   const pLvl    = getLvl(pXP);
   state.data.stats.totalXP = pXP + xpGain;
@@ -85,6 +100,7 @@ function markUndo(id) {
   const xpLoss = dy.xpAwards?.[id] ?? task.xp;
   if (dy.xpAwards) delete dy.xpAwards[id];
   if (dy.completedAt) delete dy.completedAt[id];
+  if (dy.timeLogs) delete dy.timeLogs[id];
   dy.undoCount = (dy.undoCount || 0) + 1;
   state.data.stats.totalXP = Math.max(0,(state.data.stats.totalXP||0)-xpLoss);
   if (dy.rewards?.allComplete) {
@@ -110,6 +126,289 @@ function logMood(taskId, type, value) {
   const label = type==='before' ? 'pre-task energy' : 'post-task mood';
   addLog(`MOOD (${taskId} ${type}): ${MOOD_EMOJIS[value]} (${value}/5)`,'ly');
   toast(`MOOD LOGGED ${MOOD_EMOJIS[value]}`, `${value}/5 ${label} recorded. This builds your pattern data.`, true);
+}
+
+// ── Task notes, subtasks, difficulty, Pomodoro ─────────────────
+function openTaskDetail(id) {
+  state.taskDetailId = id;
+  renderTaskDetail();
+  document.getElementById('task-overlay').classList.add('open');
+  document.getElementById('task-panel').classList.add('open');
+}
+
+function closeTaskDetail() {
+  document.getElementById('task-overlay').classList.remove('open');
+  document.getElementById('task-panel').classList.remove('open');
+}
+
+function renderTaskDetail() {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  const task = SCHED.find(t => t.id === state.taskDetailId);
+  const el = document.getElementById('task-detail');
+  if (!task || !el) return;
+
+  const notes = escapeAttr(dy.notes?.[task.id] || '');
+  const subs = dy.subtasks?.[task.id] || [];
+  const diff = dy.difficulty?.[task.id] || 'normal';
+  const log = dy.timeLogs?.[task.id] || {};
+  const pom = normalizePomodoro(dy.pomodoro?.[task.id]);
+  const status = dy.tasks?.[task.id] || 'pending';
+  const subHtml = subs.length
+    ? subs.map((s, i) => `<div class="subtask-row${s.done ? ' done' : ''}">
+        <button class="subtask-check" onclick="toggleSubtask('${task.id}',${i})">${s.done ? '✓' : ''}</button>
+        <div class="subtask-label">${escapeHtml(s.label)}</div>
+        <button class="subtask-del" onclick="deleteSubtask('${task.id}',${i})">×</button>
+      </div>`).join('')
+    : '<div class="xp-empty">No subtasks yet.</div>';
+
+  el.innerHTML = `
+    <div class="task-detail-head">
+      <div class="task-detail-emoji">${task.emoji}</div>
+      <div>
+        <div class="task-detail-title">${escapeHtml(task.label)}</div>
+        <div class="task-detail-sub">${task.time} · ${task.xp} base XP · ${status.toUpperCase()}</div>
+      </div>
+    </div>
+    <div class="panel-sec">POMODORO</div>
+    <div class="pomo-box">
+      <div class="pomo-time" id="task-pomo-time">${pomodoroText(pom)}</div>
+      <div class="pomo-mode">${pom.running ? 'RUNNING' : 'PAUSED'} · ${pom.mode === 'break' ? '5 MIN BREAK' : '25 MIN WORK'} · ${Math.floor((pom.cycles || 0) / 2)} WORK BLOCKS</div>
+      <div class="pomo-actions">
+        <button class="mini-action${pom.running ? ' on' : ''}" onclick="startPomodoro('${task.id}')">START</button>
+        <button class="mini-action" onclick="pausePomodoro('${task.id}')">PAUSE</button>
+        <button class="mini-action" onclick="resetPomodoro('${task.id}')">RESET</button>
+      </div>
+    </div>
+    <div class="time-proof">
+      <div class="stat-card"><div class="stat-k">START</div><div class="stat-v">${formatTime(log.startAt) || '--:--'}</div></div>
+      <div class="stat-card"><div class="stat-k">END</div><div class="stat-v">${formatTime(log.endAt) || '--:--'}</div></div>
+    </div>
+    <div class="panel-sec">TASK NOTES</div>
+    <textarea class="task-textarea" id="task-notes-input" onblur="saveTaskNotes('${task.id}')" placeholder="What did you actually do today?">${notes}</textarea>
+    <button class="debrief-submit" onclick="saveTaskNotes('${task.id}')">SAVE NOTES</button>
+    <div class="panel-sec">SUBTASK CHECKLIST</div>
+    <div id="subtask-list">${subHtml}</div>
+    <div class="subtask-add">
+      <input class="subtask-input" id="subtask-input" placeholder="Add a small proof step"/>
+      <button class="mini-action" onclick="addSubtask('${task.id}')">ADD</button>
+    </div>
+    <div class="panel-sec">DIFFICULTY XP</div>
+    <div class="diff-actions">
+      ${difficultyButton(task.id, 'easy', diff, 'EASY')}
+      ${difficultyButton(task.id, 'normal', diff, 'NORMAL')}
+      ${difficultyButton(task.id, 'hard', diff, 'HARD')}
+    </div>`;
+}
+
+function difficultyButton(id, val, current, label) {
+  return `<button class="mini-action${current === val ? ' on' : ''}" onclick="setTaskDifficulty('${id}','${val}')">${label}</button>`;
+}
+
+function saveTaskNotes(id) {
+  const input = document.getElementById('task-notes-input');
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  dy.notes[id] = input?.value || '';
+  save(state.data);
+  renderAll();
+  if (state.taskDetailId === id) renderTaskDetail();
+  addLog(`NOTES SAVED: ${id}`, 'ly');
+}
+
+function setTaskDifficulty(id, difficulty) {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  const task = SCHED.find(t => t.id === id);
+  if (!task) return;
+  const oldAward = dy.xpAwards?.[id] || 0;
+  dy.difficulty[id] = difficulty;
+  if (dy.tasks[id] === 'complete') {
+    const wasFail = oldAward > 0 && oldAward <= Math.floor(task.xp * .5);
+    const newAward = calculateTaskXp(task, difficulty, wasFail);
+    const delta = newAward - oldAward;
+    dy.xpAwards[id] = newAward;
+    state.data.stats.totalXP = Math.max(0, (state.data.stats.totalXP || 0) + delta);
+    if (delta) xpFloat(delta, document.getElementById('ti-' + id));
+    addLog(`DIFFICULTY: ${task.label} set to ${difficulty.toUpperCase()} (${delta >= 0 ? '+' : ''}${delta} XP adjustment)`, delta >= 0 ? 'lg' : 'ly');
+  }
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function addSubtask(id) {
+  const input = document.getElementById('subtask-input');
+  const label = (input?.value || '').trim();
+  if (!label) return;
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  if (!dy.subtasks[id]) dy.subtasks[id] = [];
+  dy.subtasks[id].push({ label, done:false, createdAt:new Date().toISOString() });
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function toggleSubtask(id, index) {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  const item = dy.subtasks?.[id]?.[index];
+  if (!item) return;
+  item.done = !item.done;
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function deleteSubtask(id, index) {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  if (!dy.subtasks?.[id]) return;
+  dy.subtasks[id].splice(index, 1);
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function startPomodoro(id) {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  if (!dy.pomodoro[id]) dy.pomodoro[id] = { mode:'work', elapsed:0, running:false, cycles:0 };
+  const pom = normalizePomodoro(dy.pomodoro[id]);
+  if (!pom.running) {
+    pom.running = true;
+    pom.startedAt = new Date().toISOString();
+    if (!dy.timeLogs[id]) dy.timeLogs[id] = {};
+    if (!dy.timeLogs[id].startAt) dy.timeLogs[id].startAt = pom.startedAt;
+  }
+  dy.pomodoro[id] = pom;
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function pausePomodoro(id) {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  pausePomodoroForDay(dy, id);
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function resetPomodoro(id) {
+  state.data = load();
+  const dy = initDay(state.data, state.todayStr);
+  dy.pomodoro[id] = { mode:'work', elapsed:0, running:false, cycles:0 };
+  save(state.data);
+  renderAll();
+  renderTaskDetail();
+}
+
+function calculateTaskXp(task, difficulty = 'normal', wasFail = false) {
+  const base = wasFail ? Math.floor(task.xp * .5) : task.xp;
+  const mult = difficulty === 'easy' ? .8 : difficulty === 'hard' ? 1.25 : 1;
+  return Math.max(1, Math.round(base * mult));
+}
+
+function activePomodoroStart(pom) {
+  return pom?.startedAt || null;
+}
+
+function normalizePomodoro(pom = {}) {
+  return {
+    mode: pom.mode === 'break' ? 'break' : 'work',
+    elapsed: Math.max(0, Number(pom.elapsed) || 0),
+    running: !!pom.running,
+    startedAt: pom.startedAt || null,
+    cycles: Math.max(0, Number(pom.cycles) || 0),
+  };
+}
+
+function pausePomodoroForDay(day, id) {
+  if (!day.pomodoro?.[id]) return;
+  const pom = normalizePomodoro(day.pomodoro[id]);
+  if (pom.running && pom.startedAt) {
+    pom.elapsed += Math.max(0, Math.floor((Date.now() - new Date(pom.startedAt).getTime()) / 1000));
+  }
+  pom.running = false;
+  pom.startedAt = null;
+  day.pomodoro[id] = pom;
+}
+
+function tickPomodoros() {
+  const data = load();
+  const dy = initDay(data, state.todayStr);
+  let changed = false;
+  Object.keys(dy.pomodoro || {}).forEach(id => {
+    const pom = normalizePomodoro(dy.pomodoro[id]);
+    if (!pom.running || !pom.startedAt) return;
+    const limit = pom.mode === 'break' ? 5 * 60 : 25 * 60;
+    const elapsed = pom.elapsed + Math.max(0, Math.floor((Date.now() - new Date(pom.startedAt).getTime()) / 1000));
+    if (elapsed >= limit) {
+      const nextMode = pom.mode === 'work' ? 'break' : 'work';
+      pom.mode = nextMode;
+      pom.elapsed = elapsed - limit;
+      pom.startedAt = new Date().toISOString();
+      pom.cycles = (pom.cycles || 0) + 1;
+      dy.pomodoro[id] = pom;
+      changed = true;
+      const task = SCHED.find(t => t.id === id);
+      const title = nextMode === 'break' ? 'BREAK STARTED' : 'WORK BLOCK STARTED';
+      addLog(`${title}: ${task?.label || id}`, nextMode === 'break' ? 'lg' : 'ly');
+      toast(title, nextMode === 'break' ? '25 minutes banked. Take 5.' : 'Break over. Next 25 starts now.', nextMode === 'break');
+    }
+  });
+  if (changed) {
+    save(data);
+    state.data = data;
+    renderAll();
+    if (state.taskDetailId) renderTaskDetail();
+  }
+  updatePomodoroUi();
+}
+
+function updatePomodoroUi() {
+  const data = load();
+  const dy = initDay(data, state.todayStr);
+  document.querySelectorAll('.pomo-chip').forEach(el => {
+    const id = el.dataset.task;
+    el.textContent = chipPomodoroText(normalizePomodoro(dy.pomodoro?.[id]));
+  });
+  const detailTime = document.getElementById('task-pomo-time');
+  if (detailTime && state.taskDetailId) {
+    detailTime.textContent = pomodoroText(normalizePomodoro(dy.pomodoro?.[state.taskDetailId]));
+  }
+}
+
+function chipPomodoroText(pom) {
+  const txt = pomodoroText(pom);
+  return `${pom.mode === 'break' ? 'BREAK' : 'WORK'} ${txt}`;
+}
+
+function pomodoroText(pom) {
+  const limit = pom.mode === 'break' ? 5 * 60 : 25 * 60;
+  const live = pom.running && pom.startedAt ? Math.max(0, Math.floor((Date.now() - new Date(pom.startedAt).getTime()) / 1000)) : 0;
+  const left = Math.max(0, limit - pom.elapsed - live);
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function escapeAttr(value) {
+  return escapeHtml(value);
 }
 
 // ── Fun activities ─────────────────────────────────────
@@ -322,6 +621,7 @@ document.addEventListener('visibilitychange', async()=>{
 
   updClock(); renderAll();
   setInterval(updClock, 1000);
+  setInterval(tickPomodoros, 1000);
   setInterval(()=>{ renderAll(); midCheck(); }, 20000);
   startPeriodicCheck();
 

@@ -1,8 +1,9 @@
 // ── Service Worker ── (save as sw.js in repo root)
-const CACHE = 'lu-v6';
+const CACHE = 'lu-v7';
 const ASSETS = ['./', './index.html', './js/app.js','./js/state.js','./js/data.js',
   './js/storage.js','./js/audio.js','./js/ui.js','./js/render.js',
-  './js/notifications.js','./js/ai.js'];
+  './js/notifications.js','./js/ai.js','./manifest.webmanifest',
+  './icons/icon.svg','./icons/icon-192.png','./icons/icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {})));

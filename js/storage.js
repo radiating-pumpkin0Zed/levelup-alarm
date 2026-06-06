@@ -32,20 +32,25 @@ export function todayKey() {
 
 export function initDay(d, k) {
   if (!d.days[k]) {
-    d.days[k] = { tasks:{}, funActs:{}, moods:{}, xpAwards:{}, completedAt:{}, rewards:{}, undoCount:0, dsaProblems:0 };
+    d.days[k] = { tasks:{}, funActs:{}, moods:{}, xpAwards:{}, completedAt:{}, rewards:{}, undoCount:0, dsaProblems:0, notes:{}, difficulty:{}, subtasks:{}, timeLogs:{}, pomodoro:{} };
     SCHED.forEach(t => { d.days[k].tasks[t.id] = 'pending'; });
   }
   // Migrate v2: tasks at root of day object
   if (!d.days[k].tasks) {
     const tasks = {};
     SCHED.forEach(t => { tasks[t.id] = d.days[k][t.id] || 'pending'; });
-    d.days[k] = { tasks, funActs: d.days[k].funActs||{}, moods:{}, xpAwards:{}, completedAt:{}, rewards:{}, undoCount:0, dsaProblems:0 };
+    d.days[k] = { tasks, funActs: d.days[k].funActs||{}, moods:{}, xpAwards:{}, completedAt:{}, rewards:{}, undoCount:0, dsaProblems:0, notes:{}, difficulty:{}, subtasks:{}, timeLogs:{}, pomodoro:{} };
   }
   if (!d.days[k].funActs)  d.days[k].funActs  = {};
   if (!d.days[k].moods)    d.days[k].moods    = {};
   if (!d.days[k].xpAwards) d.days[k].xpAwards = {};
   if (!d.days[k].completedAt) d.days[k].completedAt = {};
   if (!d.days[k].rewards)  d.days[k].rewards  = {};
+  if (!d.days[k].notes)    d.days[k].notes    = {};
+  if (!d.days[k].difficulty) d.days[k].difficulty = {};
+  if (!d.days[k].subtasks) d.days[k].subtasks = {};
+  if (!d.days[k].timeLogs) d.days[k].timeLogs = {};
+  if (!d.days[k].pomodoro) d.days[k].pomodoro = {};
   if (!Number.isFinite(d.days[k].undoCount)) d.days[k].undoCount = 0;
   if (!Number.isFinite(d.days[k].dsaProblems)) d.days[k].dsaProblems = 0;
   return d.days[k];

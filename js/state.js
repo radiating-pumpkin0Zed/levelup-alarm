@@ -8,6 +8,7 @@ export const state = {
   alarmOn: true,
   wakeLock: null,
   currentBg: 'anime',
+  taskDetailId: null,
   handles: [],       // setTimeout handles for alarms
   audioCtx: null,
 };

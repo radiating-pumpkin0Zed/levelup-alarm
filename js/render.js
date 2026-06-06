@@ -73,6 +73,28 @@ function moodPickerHtml(taskId, type, current) {
   return `<div class="mood-picker"><span class="mood-lbl">${label}</span>${btns}</div>`;
 }
 
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+
+function fmtClock(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function pomodoroLabel(pom) {
+  if (!pom) return '25:00';
+  const limit = pom.mode === 'break' ? 5 * 60 : 25 * 60;
+  const started = pom.running && pom.startedAt ? Math.floor((Date.now() - new Date(pom.startedAt).getTime()) / 1000) : 0;
+  const elapsed = Math.max(0, (pom.elapsed || 0) + started);
+  const left = Math.max(0, limit - elapsed);
+  const m = Math.floor(left / 60);
+  const s = left % 60;
+  return `${pom.mode === 'break' ? 'BREAK' : 'WORK'} ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
 // ── Main render ─────────────────────────────────────────────────
 export function renderAll() {
   state.data = load();
@@ -121,12 +143,27 @@ export function renderAll() {
     else if (s==='failed')   { cls='tfail'; bc='bfail'; bt='✗ FAIL'; }
     else if (isNow)          { cls='tnow';  bc='bnow';  bt='NOW';    }
 
-    const xpL = s==='complete' ? `+${task.xp} XP ✓` : `${task.xp} XP`;
+    const awardedXp = dy.xpAwards?.[task.id] ?? task.xp;
+    const xpL = s==='complete' ? `+${awardedXp} XP ✓` : `${task.xp} XP`;
 
     let btn = '';
-    if      (s==='pending')  btn = `<button class="tbtn bcomp" onclick="window.markDone('${task.id}')">DONE ✓</button>`;
-    else if (s==='complete') btn = `<button class="tbtn bundo" onclick="window.markUndo('${task.id}')">UNDO</button>`;
-    else if (s==='failed')   btn = `<button class="tbtn bredo" onclick="window.markDone('${task.id}')">REDO ✓</button>`;
+    if      (s==='pending')  btn = `<button class="tbtn bcomp" onclick="event.stopPropagation();window.markDone('${task.id}')">DONE ✓</button>`;
+    else if (s==='complete') btn = `<button class="tbtn bundo" onclick="event.stopPropagation();window.markUndo('${task.id}')">UNDO</button>`;
+    else if (s==='failed')   btn = `<button class="tbtn bredo" onclick="event.stopPropagation();window.markDone('${task.id}')">REDO ✓</button>`;
+
+    const notes = dy.notes?.[task.id] || '';
+    const subs = dy.subtasks?.[task.id] || [];
+    const subDone = subs.filter(st => st.done).length;
+    const log = dy.timeLogs?.[task.id] || {};
+    const diff = dy.difficulty?.[task.id] || '';
+    const pom = dy.pomodoro?.[task.id] || {};
+    const chips = [
+      `<span class="task-chip pomo-chip" data-task="${task.id}">${pomodoroLabel(pom)}</span>`,
+      notes ? '<span class="task-chip">NOTES</span>' : '',
+      subs.length ? `<span class="task-chip">${subDone}/${subs.length} SUBS</span>` : '',
+      diff ? `<span class="task-chip">${esc(diff).toUpperCase()}</span>` : '',
+      log.startAt ? `<span class="task-chip">${fmtClock(log.startAt)}-${fmtClock(log.endAt) || '...'}</span>` : '',
+    ].filter(Boolean).join('');
 
     // Mood row — show before picker for current task, after picker on complete, display if set
     let moodRow = '';
@@ -140,7 +177,7 @@ export function renderAll() {
     }
 
     html += `
-      <div class="ti ${cls}" id="ti-${task.id}">
+      <div class="ti ${cls}" id="ti-${task.id}" onclick="window.openTaskDetail('${task.id}')">
         <div class="tmain">
           <div class="ttc">
             <div class="ttime">${fmt12(task.time)}</div>
@@ -149,9 +186,11 @@ export function renderAll() {
           <div class="tbody">
             <div class="tlbl">${task.label}</div>
             <div class="txp">${xpL}</div>
+            <div class="task-meta">${chips}</div>
           </div>
           <div class="tright">
             <span class="badge ${bc}">${bt}</span>
+            <button class="tbtn binfo" onclick="event.stopPropagation();window.openTaskDetail('${task.id}')">DETAILS</button>
             ${btn}
           </div>
         </div>
