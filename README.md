@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="icons/icon.svg" width="180">
+
 # ⚔️ LEVEL UP
 
 ### Turn your daily tasks into an RPG progression system
@@ -86,7 +88,7 @@ Track your growth with:
 
 ## 🖼️ Preview
 
-> Add screenshots here once available.
+> Space left for a screenshot in the future.
 
 ```text
 Level 12
